@@ -1,0 +1,5 @@
+.asetec-odo-reservar{max-width:720px;margin:0 auto}
+.asetec-odo-reservar .selector-fecha{display:flex;gap:12px;align-items:end;margin:12px 0}
+.odo-slot-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:16px 0;padding:0;list-style:none}
+.odo-slot-list .button{width:100%}
+#fam_fields{padding:10px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc}

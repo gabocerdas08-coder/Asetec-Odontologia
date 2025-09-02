@@ -9,12 +9,8 @@ class ASETEC_ODO_Cron {
         add_action( 'asetec_odo_cron_reminders', [ $this, 'run' ] );
     }
 
-    /** Stub: Buscar citas aprobadas y enviar recordatorios a T-24h y T-2h */
     public function run(){
-        // Ejemplo de búsqueda (implementar en iteración de recordatorios):
-        // $now = new DateTime('now', ASETEC_ODO_H::tz());
-        // $t24  = (clone $now)->modify('+24 hours')->format('Y-m-d H:i:s');
-        // $t2   = (clone $now)->modify('+2 hours')->format('Y-m-d H:i:s');
-        // Query de citas 'aprobada' en ventanas cercanas y enviar correo.
+        // TODO: Implementar recordatorios T-24h y T-2h (citas 'aprobada')
+        // Buscar por rango con WP_Query y enviar emails.
     }
 }

@@ -8,15 +8,13 @@ class ASETEC_ODO_Settings {
     public static function bootstrap_defaults() {
         if ( ! get_option( 'asetec_odo_settings' ) ) {
             $defaults = [
-                // Horario base editable: múltiples tramos por día, cada uno con su duración
                 'schedule' => [
                     '1' => [ [ 'start' => '08:00', 'end' => '12:00', 'duration' => 40 ], [ 'start' => '13:00', 'end' => '17:00', 'duration' => 40 ] ],
                     '2' => [ [ 'start' => '08:00', 'end' => '12:00', 'duration' => 40 ], [ 'start' => '13:00', 'end' => '17:00', 'duration' => 40 ] ],
                     '3' => [ [ 'start' => '08:00', 'end' => '12:00', 'duration' => 40 ], [ 'start' => '13:00', 'end' => '17:00', 'duration' => 40 ] ],
                     '4' => [ [ 'start' => '08:00', 'end' => '12:00', 'duration' => 40 ], [ 'start' => '13:00', 'end' => '17:00', 'duration' => 40 ] ],
                     '5' => [ [ 'start' => '08:00', 'end' => '12:00', 'duration' => 40 ], [ 'start' => '13:00', 'end' => '17:00', 'duration' => 40 ] ],
-                    '6' => [],
-                    '7' => []
+                    '6' => [], '7' => []
                 ],
                 'allowed_durations' => [ 20, 30, 40, 60 ],
                 'min_hours_notice' => 2,
@@ -59,8 +57,8 @@ class ASETEC_ODO_Settings {
                 <?php wp_nonce_field( 'asetec_odo_save_settings', 'asetec_odo_nonce' ); ?>
                 <input type="hidden" name="action" value="asetec_odo_save_settings" />
 
-                <h2><?php esc_html_e('Horario base por día (intervalos y duración por defecto)', 'asetec-odontologia'); ?></h2>
-                <p class="description"><?php esc_html_e('Agregue múltiples intervalos por día y defina la duración por defecto de las citas para cada tramo. La doctora/recepción puede crear citas fuera de horario desde la agenda admin (sin choques).', 'asetec-odontologia'); ?></p>
+                <h2><?php esc_html_e('Horario base por día (intervalos y duración por tramo)', 'asetec-odontologia'); ?></h2>
+                <p class="description"><?php esc_html_e('Agregue múltiples intervalos por día y defina la duración por defecto para cada tramo.', 'asetec-odontologia'); ?></p>
                 <table class="widefat">
                     <thead><tr><th><?php esc_html_e('Día', 'asetec-odontologia'); ?></th><th><?php esc_html_e('Tramos', 'asetec-odontologia'); ?></th></tr></thead>
                     <tbody>

@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: ASETEC Odontología
- * Description: Gestión de citas odontológicas con horarios/slots editables, reservas con bloqueo inmediato y vistas de público/admin.
- * Version: 0.1.0
+ * Description: Gestión de citas odontológicas con horarios/slots editables, reservas con bloqueo inmediato y vistas público/admin.
+ * Version: 0.2.0
  * Author: ASETEC
  * Text Domain: asetec-odontologia
  */
@@ -10,7 +10,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 final class ASETEC_Odontologia {
-    const VERSION = '0.1.0';
+    const VERSION = '0.2.0';
     private static $instance = null;
 
     public static function instance() {
@@ -38,10 +38,17 @@ final class ASETEC_Odontologia {
         require_once ASETEC_ODO_DIR . 'includes/class-states.php';
         require_once ASETEC_ODO_DIR . 'includes/class-settings.php';
         require_once ASETEC_ODO_DIR . 'includes/class-availability.php';
-        require_once ASETEC_ODO_DIR . 'includes/class-shortcode-reservar.php';
-        require_once ASETEC_ODO_DIR . 'includes/class-shortcode-admin-agenda.php';
         require_once ASETEC_ODO_DIR . 'includes/class-emails.php';
         require_once ASETEC_ODO_DIR . 'includes/class-cron.php';
+
+        // Shortcodes / Admin
+        require_once ASETEC_ODO_DIR . 'includes/class-shortcode-reservar.php';
+        require_once ASETEC_ODO_DIR . 'includes/class-shortcode-admin-agenda.php';
+        require_once ASETEC_ODO_DIR . 'includes/class-admin-endpoints.php';
+
+        // Dashboard / Reportes
+        require_once ASETEC_ODO_DIR . 'includes/class-dashboard.php';
+        require_once ASETEC_ODO_DIR . 'includes/class-shortcode-dashboard.php';
     }
 
     public function init() {
@@ -55,6 +62,7 @@ final class ASETEC_Odontologia {
         ASETEC_ODO_Shortcode_Reservar::instance();
         ASETEC_ODO_Shortcode_Admin_Agenda::instance();
         ASETEC_ODO_Cron::instance();
+        // Dashboard y endpoints se autoinicializan en sus archivos
     }
 
     public static function activate() {
@@ -72,7 +80,7 @@ final class ASETEC_Odontologia {
     }
 }
 
-// Intervalo cada 15 min
+// Intervalo cada 15 min para recordatorios
 add_filter( 'cron_schedules', function( $schedules ) {
     if ( ! isset( $schedules['quarterhourly'] ) ) {
         $schedules['quarterhourly'] = [

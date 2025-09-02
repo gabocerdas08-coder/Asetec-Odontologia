@@ -42,6 +42,9 @@ final class ASETEC_Odontologia {
         require_once ASETEC_ODO_DIR . 'includes/class-shortcode-admin-agenda.php';
         require_once ASETEC_ODO_DIR . 'includes/class-emails.php';
         require_once ASETEC_ODO_DIR . 'includes/class-cron.php';
+        require_once ASETEC_ODO_DIR . 'includes/class-admin-endpoints.php';
+        require_once ASETEC_ODO_DIR . 'includes/class-dashboard.php';
+        require_once ASETEC_ODO_DIR . 'includes/class-shortcode-dashboard.php';
     }
 
     public function init() {

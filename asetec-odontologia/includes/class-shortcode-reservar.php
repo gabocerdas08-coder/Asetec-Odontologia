@@ -45,7 +45,6 @@ class ASETEC_ODO_Shortcode_Reservar {
                 <p><label><?php esc_html_e('Cédula', 'asetec-odontologia'); ?> <input type="text" name="cedula" required></label></p>
                 <p><label><?php esc_html_e('Correo', 'asetec-odontologia'); ?> <input type="email" name="correo" required></label></p>
                 <p><label><?php esc_html_e('Teléfono', 'asetec-odontologia'); ?> <input type="tel" name="telefono" required></label></p>
-
                 <p><label><input type="checkbox" name="es_asociado" value="1"> <?php esc_html_e('Soy asociado', 'asetec-odontologia'); ?></label></p>
                 <p><label><input type="checkbox" name="es_familiar" id="chk_fam" value="1"> <?php esc_html_e('Es un familiar directo', 'asetec-odontologia'); ?></label></p>
                 <div id="fam_fields" style="display:none;">
@@ -55,7 +54,6 @@ class ASETEC_ODO_Shortcode_Reservar {
                     <p><label><?php esc_html_e('Correo del familiar', 'asetec-odontologia'); ?> <input type="email" name="familiar_correo"></label></p>
                     <p><label><?php esc_html_e('Teléfono del familiar', 'asetec-odontologia'); ?> <input type="tel" name="familiar_telefono"></label></p>
                 </div>
-
                 <p><button class="button button-primary" id="odo_submit"><?php esc_html_e('Solicitar cita', 'asetec-odontologia'); ?></button></p>
             </form>
         </div>
@@ -90,7 +88,7 @@ class ASETEC_ODO_Shortcode_Reservar {
             wp_send_json_error(['msg'=>'Datos incompletos']);
         }
 
-        // Límite activo por persona
+        // Límite de citas activas por persona
         $limit = intval( ASETEC_ODO_H::opt('max_active_per_person', 2 ) );
         $active = new WP_Query([
             'post_type' => 'cita_odontologia',
@@ -106,11 +104,10 @@ class ASETEC_ODO_Shortcode_Reservar {
             wp_send_json_error(['msg'=>sprintf( __('Ya tiene %d citas activas. No es posible crear otra.', 'asetec-odontologia'), $limit )]);
         }
 
-        // Validaciones de horario
+        // Validación de tiempo y choque
         $sdt = ASETEC_ODO_H::to_dt( $start );
         $edt = ASETEC_ODO_H::to_dt( $end );
         if ( ! $sdt || ! $edt || $edt <= $sdt ) wp_send_json_error(['msg'=>'Horario inválido']);
-
         $minh = intval( ASETEC_ODO_H::opt('min_hours_notice', 2) );
         $now  = new DateTime('now', ASETEC_ODO_H::tz());
         if ( $sdt < (clone $now)->modify("+{$minh} hours") ) {
@@ -120,7 +117,7 @@ class ASETEC_ODO_Shortcode_Reservar {
             wp_send_json_error(['msg'=>__('Ese horario ya no está disponible.', 'asetec-odontologia')]);
         }
 
-        // Crear cita en pendiente (bloqueo)
+        // Crear cita en pendiente (bloqueo inmediato)
         $post_id = wp_insert_post([
             'post_type' => 'cita_odontologia',
             'post_status' => 'publish',
@@ -146,7 +143,9 @@ class ASETEC_ODO_Shortcode_Reservar {
         }
         update_post_meta( $post_id, 'estado', 'pendiente' );
 
+        // Email de acuse al solicitante (básico). En la aprobación se enviará .ics
         ASETEC_ODO_Emails::send_request_received( $post_id );
+
         wp_send_json_success(['msg'=>__('Su solicitud fue enviada. Recibirá confirmación por correo tras la aprobación.', 'asetec-odontologia')]);
     }
 }

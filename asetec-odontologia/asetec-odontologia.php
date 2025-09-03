@@ -2,14 +2,14 @@
 /**
  * Plugin Name: ASETEC Odontología
  * Description: Gestión de citas odontológicas (slots editables, reservas, agenda admin, dashboard y correos .ics).
- * Version: 0.2.2
+ * Version: 0.2.3
  * Author: ASETEC
  * Text Domain: asetec-odontologia
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 final class ASETEC_Odontologia {
-    const VERSION = '0.2.2';
+    const VERSION = '0.2.3';
     private static $instance = null;
 
     public static function instance() { return self::$instance ?? ( self::$instance = new self() ); }

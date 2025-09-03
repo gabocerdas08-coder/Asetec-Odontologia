@@ -9,12 +9,13 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
 
     private function __construct(){
         add_shortcode( 'odo_admin_agenda', [ $this, 'render' ] );
+        // Cargar assets tanto en admin como en el front (usás Elementor)
         add_action( 'admin_enqueue_scripts', [ $this, 'assets' ] );
         add_action( 'wp_enqueue_scripts',    [ $this, 'assets' ] );
     }
 
     public function assets( $hook = '' ){
-        // Evitar la página interna de settings del plugin
+        // Evitar la página interna de ajustes del plugin
         if ( is_admin() && isset($_GET['page']) && $_GET['page'] === 'asetec-odo' ) return;
 
         // FullCalendar (CDN para simplificar)

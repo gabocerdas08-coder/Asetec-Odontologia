@@ -21,15 +21,14 @@ class ASETEC_ODO_Admin_Endpoints {
         check_ajax_referer('asetec_odo_admin','nonce');
     }
 
-    private function iso_to_local( $iso ){
-        try {
-            $tz = ASETEC_ODO_H::tz();
-            $dt = new DateTime( $iso );
-            $dt->setTimezone( $tz );
-            return $dt->format('Y-m-d H:i:s');
-        } catch ( Exception $e ){
-            return '';
-        }
+    // ===== helpers internos (sin depender de ASETEC_ODO_H) =====
+    private function wp_tz(){ $tz = wp_timezone_string(); return new DateTimeZone($tz ?: 'UTC'); }
+    private function fmt( DateTime $dt ){ return $dt->format('Y-m-d H:i:s'); }
+    private function to_dt( $str ){
+        // acepta "YYYY-MM-DD HH:MM[:SS]" o "YYYY-MM-DDTHH:MM[:SS]"
+        $str = str_replace('T',' ', trim($str));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/', $str)) return null;
+        try { return new DateTime($str, $this->wp_tz()); } catch (Exception $e){ return null; }
     }
 
     private function overlap_exists( DateTime $s, DateTime $f, $exclude_id = 0 ): bool {
@@ -40,11 +39,8 @@ class ASETEC_ODO_Admin_Endpoints {
             'fields'         => 'ids',
             'meta_query'     => [
                 'relation' => 'AND',
-                // start < range_end
-                [ 'key'=>'fecha_hora_inicio', 'compare'=>'<', 'value'=> ASETEC_ODO_H::fmt($f), 'type'=>'DATETIME' ],
-                // end   > range_start
-                [ 'key'=>'fecha_hora_fin',    'compare'=>'>', 'value'=> ASETEC_ODO_H::fmt($s), 'type'=>'DATETIME' ],
-                // solo pendientes/aprobadas/reprogramadas bloquean
+                [ 'key'=>'fecha_hora_inicio', 'compare'=>'<', 'value'=> $this->fmt($f), 'type'=>'DATETIME' ],
+                [ 'key'=>'fecha_hora_fin',    'compare'=>'>', 'value'=> $this->fmt($s), 'type'=>'DATETIME' ],
                 [ 'key'=>'estado', 'value'=> ['pendiente','aprobada','reprogramada'], 'compare'=>'IN' ],
             ],
         ];
@@ -58,12 +54,19 @@ class ASETEC_ODO_Admin_Endpoints {
         $this->verify_admin();
         $startIso = sanitize_text_field($_POST['start'] ?? '');
         $endIso   = sanitize_text_field($_POST['end'] ?? '');
-        if(!$startIso || !$endIso) wp_send_json_success([ 'events' => [] ]); // no bloqueamos UI
+        if(!$startIso || !$endIso){ wp_send_json_success([ 'events' => [] ]); return; }
 
-        $rangeStart = $this->iso_to_local( $startIso );
-        $rangeEnd   = $this->iso_to_local( $endIso );
+        // convertimos a local
+        try{
+            $tz = $this->wp_tz();
+            $rs = new DateTime(str_replace('T',' ', $startIso), $tz);
+            $re = new DateTime(str_replace('T',' ', $endIso),   $tz);
+        } catch (Exception $e){
+            error_log('ASETEC ODO events: rango inválido');
+            wp_send_json_success([ 'events' => [] ]);
+            return;
+        }
 
-        // Traer cualquier cita que se solape con el rango (no solo las contenidas)
         $q = new WP_Query([
             'post_type'      => 'cita_odontologia',
             'post_status'    => 'any',
@@ -71,8 +74,8 @@ class ASETEC_ODO_Admin_Endpoints {
             'fields'         => 'ids',
             'meta_query'     => [
                 'relation' => 'AND',
-                [ 'key'=>'fecha_hora_inicio', 'compare'=>'<', 'value'=>$rangeEnd,   'type'=>'DATETIME' ],
-                [ 'key'=>'fecha_hora_fin',    'compare'=>'>', 'value'=>$rangeStart, 'type'=>'DATETIME' ],
+                [ 'key'=>'fecha_hora_inicio', 'compare'=>'<', 'value'=>$this->fmt($re), 'type'=>'DATETIME' ],
+                [ 'key'=>'fecha_hora_fin',    'compare'=>'>', 'value'=>$this->fmt($rs), 'type'=>'DATETIME' ],
             ],
         ]);
 
@@ -109,7 +112,7 @@ class ASETEC_ODO_Admin_Endpoints {
         wp_send_json_success($d);
     }
 
-    /** --------- CREAR (bloqueo inmediato) --------- */
+    /** --------- CREAR --------- */
     public function create(){
         $this->verify_admin();
         $start = sanitize_text_field($_POST['start'] ?? '');
@@ -123,12 +126,13 @@ class ASETEC_ODO_Admin_Endpoints {
             wp_send_json_error(['msg'=>'Datos incompletos o inválidos']);
         }
 
-        $sdt = ASETEC_ODO_H::to_dt( $start );
-        $edt = ASETEC_ODO_H::to_dt( $end );
+        $sdt = $this->to_dt($start);
+        $edt = $this->to_dt($end);
         if(!$sdt || !$edt || $edt <= $sdt) wp_send_json_error(['msg'=>'Rango horario inválido']);
 
-        $minh = intval( ASETEC_ODO_H::opt('min_hours_notice', 2) );
-        $now  = new DateTime('now', ASETEC_ODO_H::tz());
+        // Anticipación (2h por defecto)
+        $minh = 2;
+        $now  = new DateTime('now', $this->wp_tz());
         if ( $sdt < (clone $now)->modify("+{$minh} hours") ) {
             wp_send_json_error(['msg'=>sprintf('Debe crear con al menos %d horas de anticipación.', $minh)]);
         }
@@ -144,18 +148,14 @@ class ASETEC_ODO_Admin_Endpoints {
         ], true);
         if ( is_wp_error($post_id) ) wp_send_json_error(['msg'=>'No se pudo crear la cita']);
 
-        update_post_meta( $post_id, 'fecha_hora_inicio', ASETEC_ODO_H::fmt($sdt) );
-        update_post_meta( $post_id, 'fecha_hora_fin',    ASETEC_ODO_H::fmt($edt) );
+        update_post_meta( $post_id, 'fecha_hora_inicio', $this->fmt($sdt) );
+        update_post_meta( $post_id, 'fecha_hora_fin',    $this->fmt($edt) );
         update_post_meta( $post_id, 'duracion_min', max(5, intval( ( $edt->getTimestamp() - $sdt->getTimestamp() ) / 60 )) );
         update_post_meta( $post_id, 'paciente_nombre', $nombre );
         update_post_meta( $post_id, 'paciente_cedula', $ced );
         update_post_meta( $post_id, 'paciente_correo', $mail );
         update_post_meta( $post_id, 'paciente_telefono', $tel );
         update_post_meta( $post_id, 'estado', 'pendiente' );
-
-        if ( class_exists('ASETEC_ODO_Emails') ) {
-            ASETEC_ODO_Emails::send_request_received( $post_id );
-        }
 
         wp_send_json_success(['id'=>$post_id, 'estado'=>'pendiente']);
     }
@@ -166,9 +166,6 @@ class ASETEC_ODO_Admin_Endpoints {
         $id = intval($_POST['id'] ?? 0);
         if(!$id) wp_send_json_error(['msg'=>'ID inválido']);
         update_post_meta($id,'estado','aprobada');
-        if ( class_exists('ASETEC_ODO_Emails') ) {
-            ASETEC_ODO_Emails::send_approved_with_ics($id);
-        }
         wp_send_json_success(['msg'=>'Aprobada']);
     }
 
@@ -178,9 +175,6 @@ class ASETEC_ODO_Admin_Endpoints {
         $id = intval($_POST['id'] ?? 0);
         if(!$id) wp_send_json_error(['msg'=>'ID inválido']);
         update_post_meta($id,'estado','cancelada_admin');
-        if ( class_exists('ASETEC_ODO_Emails') ) {
-            ASETEC_ODO_Emails::send_cancelled($id);
-        }
         wp_send_json_success(['msg'=>'Cancelada']);
     }
 
@@ -201,16 +195,16 @@ class ASETEC_ODO_Admin_Endpoints {
         $end   = sanitize_text_field($_POST['end'] ?? '');
         if(!$id || !$start || !$end) wp_send_json_error(['msg'=>'Parámetros inválidos']);
 
-        $sdt = ASETEC_ODO_H::to_dt($start);
-        $edt = ASETEC_ODO_H::to_dt($end);
+        $sdt = $this->to_dt($start);
+        $edt = $this->to_dt($end);
         if(!$sdt || !$edt || $edt <= $sdt) wp_send_json_error(['msg'=>'Rango horario inválido']);
 
         if ( $this->overlap_exists( $sdt, $edt, $id ) ) {
             wp_send_json_error(['msg'=>'Ese horario se cruza con otra cita.']);
         }
 
-        update_post_meta($id,'fecha_hora_inicio', ASETEC_ODO_H::fmt($sdt));
-        update_post_meta($id,'fecha_hora_fin', ASETEC_ODO_H::fmt($edt));
+        update_post_meta($id,'fecha_hora_inicio', $this->fmt($sdt));
+        update_post_meta($id,'fecha_hora_fin',    $this->fmt($edt));
         update_post_meta($id,'duracion_min', max(5, intval( ( $edt->getTimestamp() - $sdt->getTimestamp() ) / 60 )) );
 
         $estado = get_post_meta($id,'estado',true);

@@ -1,7 +1,7 @@
 (function($){
   $(function(){
     var el = document.getElementById('odo-calendar');
-    if(!el) return;
+    if(!el){ console.warn('ASETEC ODO: #odo-calendar no existe'); return; }
 
     // ---------- helpers UI ----------
     function openModal(title){
@@ -10,7 +10,8 @@
     }
     function closeModal(){
       $('#odo-modal').attr('aria-hidden','true').removeClass('is-open');
-      $('#odo-form')[0].reset();
+      var f = document.getElementById('odo-form');
+      if (f) f.reset();
       $('#odo_post_id').val('');
       $('#odo_estado').val('');
       $('#odo-btn-save').show();
@@ -19,8 +20,7 @@
       $('#odo-btn-cancel').show();
       $('#odo-btn-done').show();
     }
-    $('#odo-btn-close').on('click', closeModal);
-    $('.odo-modal__backdrop').on('click', closeModal);
+    $(document).on('click','#odo-btn-close,.odo-modal__backdrop', closeModal);
 
     function toLocalInput(dtStr){
       if(!dtStr) return '';
@@ -56,7 +56,15 @@
       selectable: true,
       editable: true,
 
+      // *** Blindaje para que nunca quede en spinner ***
       events: function(info, success){
+        var timedOut = false;
+        var to = setTimeout(function(){
+          timedOut = true;
+          console.warn('ASETEC ODO: timeout eventos → mostrando vacío');
+          success([]);
+        }, 7000); // 7s de margen
+
         $.post(ASETEC_ODO_ADMIN.ajax, {
           action:'asetec_odo_events',
           nonce: ASETEC_ODO_ADMIN.nonce,
@@ -64,6 +72,8 @@
           end: info.endStr
         })
         .done(function(r){
+          if (timedOut) return;
+          clearTimeout(to);
           if(r && r.success && r.data && Array.isArray(r.data.events)){
             var evs = r.data.events.map(function(ev){
               var est = ev.extendedProps && ev.extendedProps.estado;
@@ -78,52 +88,47 @@
           }
         })
         .fail(function(xhr){
+          if (timedOut) return;
+          clearTimeout(to);
           console.error('ASETEC ODO: fallo AJAX eventos', xhr.status, xhr.responseText);
           success([]);
         });
       },
 
-      // ---- CREAR: selección de rango ----
       select: function(sel){
         $('#odo_start').val( toLocalInput(sel.startStr.replace('Z','').replace('T',' ')) );
         $('#odo_end').val( toLocalInput(sel.endStr  .replace('Z','').replace('T',' ')) );
         $('#odo_estado').val('pendiente');
-        $('#odo-btn-approve').hide();
-        $('#odo-btn-done').hide();
-        $('#odo-btn-cancel').hide();
-        $('#odo-btn-save').show();
-        $('#odo-btn-update').hide();
-        openModal(ASETEC_ODO_ADMIN.i18n.create_title);
+        $('#odo-btn-approve,#odo-btn-done,#odo-btn-cancel').hide();
+        $('#odo-btn-save').show(); $('#odo-btn-update').hide();
+        openModal('Nueva cita');
       },
 
-      // ---- EDITAR: click evento ----
       eventClick: function(info){
-        var id = info.event.extendedProps.post_id;
+        var id = info.event.extendedProps && info.event.extendedProps.post_id;
         if(!id) return;
-
-        $.post(ASETEC_ODO_ADMIN.ajax, { action:'asetec_odo_show', nonce:ASETEC_ODO_ADMIN.nonce, id:id }, function(r){
+        $.post(ASETEC_ODO_ADMIN.ajax, { action:'asetec_odo_show', nonce:ASETEC_ODO_ADMIN.nonce, id:id })
+        .done(function(r){
           if(!r.success){ alert(r.data && r.data.msg || 'Error'); return; }
-          var d = r.data;
+          var d = r.data || {};
           $('#odo_post_id').val(id);
-          $('#odo_start').val( toLocalInput(d.start) );
-          $('#odo_end').val( toLocalInput(d.end) );
+          $('#odo_start').val( toLocalInput((d.start||'').replace('T',' ')) );
+          $('#odo_end').val( toLocalInput((d.end||'').replace('T',' ')) );
           $('#odo_nombre').val( d.nombre || '' );
           $('#odo_cedula').val( d.cedula || '' );
           $('#odo_correo').val( d.correo || '' );
           $('#odo_telefono').val( d.telefono || '' );
           $('#odo_estado').val( d.estado || '' );
-
-          $('#odo-btn-save').hide();
-          $('#odo-btn-update').show();
-          $('#odo-btn-approve').show();
-          $('#odo-btn-cancel').show();
-          $('#odo-btn-done').show();
-
-          openModal(ASETEC_ODO_ADMIN.i18n.edit_title);
+          $('#odo-btn-save').hide(); $('#odo-btn-update').show();
+          $('#odo-btn-approve,#odo-btn-done,#odo-btn-cancel').show();
+          openModal('Cita');
+        })
+        .fail(function(xhr){
+          alert('Error al cargar la cita');
+          console.error('ASETEC ODO: fallo show', xhr.status, xhr.responseText);
         });
       },
 
-      // ---- Reprogramar moviendo ----
       eventDrop: function(info){
         var id = info.event.extendedProps.post_id;
         var start = info.event.startStr.replace('Z','');
@@ -135,23 +140,21 @@
         });
       },
 
-      // ---- Reprogramar cambiando duración ----
       eventResize: function(info){
         var id = info.event.extendedProps.post_id;
         var start = info.event.startStr.replace('Z','');
         var end   = info.event.endStr.replace('Z','');
         if(!id || !start || !end){ info.revert(); return; }
         $.post(ASETEC_ODO_ADMIN.ajax, { action:'asetec_odo_reschedule', nonce:ASETEC_ODO_ADMIN.nonce, id:id, start:start, end:end }, function(r){
-            if(!r.success){ alert(r.data && r.data.msg || 'No se pudo ajustar'); info.revert(); return; }
-            cal.refetchEvents();
+          if(!r.success){ alert(r.data && r.data.msg || 'No se pudo ajustar'); info.revert(); return; }
+          cal.refetchEvents();
         });
       }
     });
 
     cal.render();
 
-    // ---------- acciones modal ----------
-    // Guardar (crear)
+    // ----- acciones modal -----
     $('#odo-btn-save').on('click', function(){
       var payload = {
         action:'asetec_odo_create', nonce:ASETEC_ODO_ADMIN.nonce,
@@ -165,13 +168,14 @@
       $.post(ASETEC_ODO_ADMIN.ajax, payload, function(r){
         if(!r.success){ alert(r.data && r.data.msg || 'No se pudo crear'); return; }
         closeModal(); cal.refetchEvents();
+      }).fail(function(xhr){
+        alert('Error al crear');
+        console.error('ASETEC ODO: fallo create', xhr.status, xhr.responseText);
       });
     });
 
-    // Actualizar horarios (reprogramar)
     $('#odo-btn-update').on('click', function(){
-      var id = $('#odo_post_id').val();
-      if(!id) return;
+      var id = $('#odo_post_id').val(); if(!id) return;
       var payload = {
         action:'asetec_odo_reschedule', nonce:ASETEC_ODO_ADMIN.nonce, id:id,
         start: fromLocalInput($('#odo_start').val()),
@@ -180,10 +184,12 @@
       $.post(ASETEC_ODO_ADMIN.ajax, payload, function(r){
         if(!r.success){ alert(r.data && r.data.msg || 'No se pudo actualizar'); return; }
         closeModal(); cal.refetchEvents();
+      }).fail(function(xhr){
+        alert('Error al actualizar');
+        console.error('ASETEC ODO: fallo reschedule', xhr.status, xhr.responseText);
       });
     });
 
-    // Aprobar
     $('#odo-btn-approve').on('click', function(){
       var id = $('#odo_post_id').val(); if(!id) return;
       $.post(ASETEC_ODO_ADMIN.ajax, { action:'asetec_odo_approve', nonce:ASETEC_ODO_ADMIN.nonce, id:id }, function(r){
@@ -192,7 +198,6 @@
       });
     });
 
-    // Cancelar
     $('#odo-btn-cancel').on('click', function(){
       var id = $('#odo_post_id').val(); if(!id) return;
       if(!confirm('¿Seguro que desea cancelar esta cita?')) return;
@@ -202,7 +207,6 @@
       });
     });
 
-    // Realizada
     $('#odo-btn-done').on('click', function(){
       var id = $('#odo_post_id').val(); if(!id) return;
       $.post(ASETEC_ODO_ADMIN.ajax, { action:'asetec_odo_mark_done', nonce:ASETEC_ODO_ADMIN.nonce, id:id }, function(r){

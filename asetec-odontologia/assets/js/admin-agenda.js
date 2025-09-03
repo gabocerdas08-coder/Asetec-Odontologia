@@ -58,23 +58,39 @@
       selectable: true,   // crear
       editable: true,     // drag/resize
 
-      events: function(info, ok, fail){
-        $.post(ASETEC_ODO_ADMIN.ajax, {
-          action:'asetec_odo_events',
-          nonce: ASETEC_ODO_ADMIN.nonce,
-          start: info.startStr,
-          end: info.endStr
-        }, function(r){
-          if(!r.success){ fail(r.data && r.data.msg || 'Error'); return; }
-          var evs = (r.data.events||[]).map(function(ev){
-            var est = ev.extendedProps && ev.extendedProps.estado;
-            if(est){ ev.backgroundColor = estadoColor(est); ev.borderColor = ev.backgroundColor; }
-            ev.display = 'block';
-            return ev;
-          });
-          ok(evs);
-        });
-      },
+     events: function(info, success, failure){
+  $.post(ASETEC_ODO_ADMIN.ajax, {
+    action:'asetec_odo_events',
+    nonce: ASETEC_ODO_ADMIN.nonce,
+    start: info.startStr,
+    end: info.endStr
+  })
+  .done(function(r){
+    if(r && r.success && r.data && Array.isArray(r.data.events)){
+      var evs = r.data.events.map(function(ev){
+        var est = ev.extendedProps && ev.extendedProps.estado;
+        if(est){
+          ev.backgroundColor = ({
+            pendiente:'#f59e0b', aprobada:'#3b82f6', realizada:'#10b981',
+            cancelada_usuario:'#ef4444', cancelada_admin:'#ef4444', reprogramada:'#8b5cf6'
+          })[est] || '#64748b';
+          ev.borderColor = ev.backgroundColor;
+        }
+        ev.display = 'block';
+        return ev;
+      });
+      success(evs);
+    } else {
+      console.warn('ASETEC ODO: respuesta inválida de eventos', r);
+      success([]); // <- evitar spinner infinito
+    }
+  })
+  .fail(function(xhr){
+    console.error('ASETEC ODO: fallo AJAX eventos', xhr.status, xhr.responseText);
+    success([]); // <- evitar spinner infinito
+  });
+}
+,
 
       // ---- crear cita desde selección ----
       select: function(sel){

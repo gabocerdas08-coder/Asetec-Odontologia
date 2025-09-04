@@ -14,90 +14,20 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
     }
 
     public function assets( $hook = '' ){
+        // Evita la página de ajustes interna
         if ( is_admin() && isset($_GET['page']) && $_GET['page'] === 'asetec-odo' ) return;
 
-        // FullCalendar por CDN
+        // FullCalendar por CDN (sin dependencias locales)
         wp_register_style( 'fc-core', 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css', [], '6.1.15' );
         wp_register_script('fc-core', 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js', [], '6.1.15', true );
 
-        // Nuestro JS con “cache busting”
-        $ver = file_exists(ASETEC_ODO_DIR.'assets/js/admin-agenda.js') ? filemtime(ASETEC_ODO_DIR.'assets/js/admin-agenda.js') : ASETEC_Odontologia::VERSION;
-        wp_register_script( 'asetec-odo-admin', ASETEC_ODO_URL.'assets/js/admin-agenda.js', [ 'jquery', 'fc-core' ], $ver, true );
-    }
+        // Nuestro JS (versionado con time() para romper caché)
+        wp_register_script( 'asetec-odo-admin', ASETEC_ODO_URL.'assets/js/admin-agenda.js', [ 'jquery', 'fc-core' ], time(), true );
 
-    /** Construye el arreglo de eventos (array) para bootstrapping */
-    private function build_event( $pid ){
-        $s = get_post_meta($pid,'fecha_hora_inicio',true);
-        $f = get_post_meta($pid,'fecha_hora_fin',true);
-
-        // ⛔ Validar que existan y tengan formato correcto
-        if( empty($s) || empty($f) || !preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',$s) || !preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',$f) ){
-            error_log("ASETEC ODO: Cita ID $pid tiene fechas inválidas. Inicio: $s Fin: $f");
-            return null; // se salta esta cita
-        }
-
-        $estado = get_post_meta($pid,'estado',true) ?: 'pendiente';
-        $pac = get_post_meta($pid,'paciente_nombre',true) ?: 'Sin nombre';
-
-        return [
-            'title' => trim($pac.' ['.$estado.']'),
-            'start' => str_replace(' ','T',$s),
-            'end'   => str_replace(' ','T',$f),
-            'extendedProps' => [ 'post_id' => $pid, 'estado'=>$estado ]
-        ];
-    }
-
-
-    /** Obtiene eventos del rango visible inicial (semana actual) sin AJAX */
-    private function bootstrap_events(){
-        try {
-            $tz = wp_timezone_string() ?: 'UTC';
-            $now = new DateTime('now', new DateTimeZone($tz));
-            // lunes de esta semana 00:00
-            $dow = (int) $now->format('N'); // 1..7
-            $start = (clone $now)->modify('-'.($dow-1).' days')->setTime(0,0,0);
-            $end   = (clone $start)->modify('+7 days');
-
-            $q = new WP_Query([
-                'post_type'      => 'cita_odontologia',
-                'post_status'    => 'any',
-                'posts_per_page' => 999,
-                'fields'         => 'ids',
-                'meta_query'     => [
-                    'relation' => 'AND',
-                    [ 'key'=>'fecha_hora_inicio', 'compare'=>'<', 'value'=> $end->format('Y-m-d H:i:s'),  'type'=>'DATETIME' ],
-                    [ 'key'=>'fecha_hora_fin',    'compare'=>'>', 'value'=> $start->format('Y-m-d H:i:s'),'type'=>'DATETIME' ],
-                ],
-            ]);
-            $events = [];
-            foreach( $q->posts as $pid ){
-    $event = $this->build_event($pid);
-    if($event !== null){
-        $events[] = $event;
-    }
-}
-
-            return $events;
-        } catch ( Exception $e ){
-            return [];
-        }
-    }
-
-    public function render(){
-        if ( ! current_user_can( 'manage_options' ) ) return '<p>No autorizado.</p>';
-
-        // Precarga de datos (para arrancar sin AJAX)
-        $bootstrap = $this->bootstrap_events();
-
-        wp_enqueue_style('fc-core');
-        wp_enqueue_script('fc-core');
-        wp_enqueue_script('asetec-odo-admin');
-
-        // Pasamos bootstrap y strings al JS
         wp_localize_script( 'asetec-odo-admin', 'ASETEC_ODO_ADMIN', [
             'ajax'  => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('asetec_odo_admin'),
-            'bootstrapEvents' => $bootstrap,
+            'bootstrapEvents' => [], // SAFE: no pre-carga; evitamos WP_Query aquí
             'i18n'  => [
                 'create_title' => __('Nueva cita', 'asetec-odontologia'),
                 'edit_title'   => __('Cita', 'asetec-odontologia'),
@@ -109,17 +39,24 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
                 'close'        => __('Cerrar', 'asetec-odontologia'),
             ]
         ] );
+    }
+
+    public function render(){
+        if ( ! current_user_can( 'manage_options' ) ) return '<p>No autorizado.</p>';
+
+        wp_enqueue_style('fc-core');
+        wp_enqueue_script('fc-core');
+        wp_enqueue_script('asetec-odo-admin');
 
         ob_start(); ?>
         <style>
-          /* Estilos mínimos inline para no depender de otro archivo */
+          /* Estilos inline, sin archivo CSS externo */
           .odo-calendar .fc { --fc-border-color:#e5e7eb; font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; }
           .odo-calendar .fc-timegrid-slot-label { font-size:12px; color:#374151; }
           .odo-calendar .fc-toolbar-title { font-weight:700; letter-spacing:0.2px; }
           .odo-calendar .fc-event { border-radius:8px; padding:2px 4px; font-size:12px; }
           .odo-calendar .fc-timegrid-slot { height:1.6em; }
           .odo-calendar { min-height:640px; }
-
           .odo-modal { position:fixed; inset:0; z-index:9999; display:none; }
           .odo-modal.is-open { display:block; }
           .odo-modal__backdrop { position:absolute; inset:0; background:rgba(15,23,42,.45); }
@@ -144,7 +81,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
             <div id="odo-calendar" class="odo-calendar"></div>
         </div>
 
-        <!-- Modal ASETEC (crear/gestionar) -->
+        <!-- Modal ASETEC -->
         <div id="odo-modal" class="odo-modal" aria-hidden="true">
           <div class="odo-modal__backdrop"></div>
           <div class="odo-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="odo-modal-title">
@@ -152,50 +89,45 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
               <h3 id="odo-modal-title"></h3>
               <button type="button" class="odo-btn odo-btn--ghost" id="odo-btn-close">✕</button>
             </div>
-
             <div class="odo-modal__body">
               <form id="odo-form">
-                <input type="hidden" name="post_id" id="odo_post_id">
+                <input type="hidden" id="odo_post_id">
                 <div class="odo-grid">
                   <div class="odo-field">
                     <label>Inicio</label>
-                    <input type="datetime-local" id="odo_start" name="start" required>
+                    <input type="datetime-local" id="odo_start" required>
                   </div>
                   <div class="odo-field">
                     <label>Fin</label>
-                    <input type="datetime-local" id="odo_end" name="end" required>
+                    <input type="datetime-local" id="odo_end" required>
                   </div>
                 </div>
-
                 <div class="odo-grid">
                   <div class="odo-field">
                     <label>Nombre completo</label>
-                    <input type="text" id="odo_nombre" name="nombre" required>
+                    <input type="text" id="odo_nombre" required>
                   </div>
                   <div class="odo-field">
                     <label>Cédula</label>
-                    <input type="text" id="odo_cedula" name="cedula" required>
+                    <input type="text" id="odo_cedula" required>
                   </div>
                 </div>
-
                 <div class="odo-grid">
                   <div class="odo-field">
                     <label>Correo</label>
-                    <input type="email" id="odo_correo" name="correo" required>
+                    <input type="email" id="odo_correo" required>
                   </div>
                   <div class="odo-field">
                     <label>Teléfono</label>
-                    <input type="tel" id="odo_telefono" name="telefono" required>
+                    <input type="tel" id="odo_telefono" required>
                   </div>
                 </div>
-
                 <div class="odo-field">
                   <label>Estado</label>
-                  <input type="text" id="odo_estado" name="estado" readonly>
+                  <input type="text" id="odo_estado" readonly>
                 </div>
               </form>
             </div>
-
             <div class="odo-modal__footer">
               <div class="odo-actions-left">
                 <button type="button" class="odo-btn" id="odo-btn-save"><?php esc_html_e('Guardar', 'asetec-odontologia'); ?></button>

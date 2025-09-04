@@ -29,15 +29,24 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
     private function build_event( $pid ){
         $s = get_post_meta($pid,'fecha_hora_inicio',true);
         $f = get_post_meta($pid,'fecha_hora_fin',true);
-        $estado = get_post_meta($pid,'estado',true);
-        $pac = get_post_meta($pid,'paciente_nombre',true);
+
+        // ⛔ Validar que existan y tengan formato correcto
+        if( empty($s) || empty($f) || !preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',$s) || !preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',$f) ){
+            error_log("ASETEC ODO: Cita ID $pid tiene fechas inválidas. Inicio: $s Fin: $f");
+            return null; // se salta esta cita
+        }
+
+        $estado = get_post_meta($pid,'estado',true) ?: 'pendiente';
+        $pac = get_post_meta($pid,'paciente_nombre',true) ?: 'Sin nombre';
+
         return [
-            'title' => trim(($pac?:__('Cita','asetec-odontologia')).' ['.$estado.']'),
+            'title' => trim($pac.' ['.$estado.']'),
             'start' => str_replace(' ','T',$s),
             'end'   => str_replace(' ','T',$f),
             'extendedProps' => [ 'post_id' => $pid, 'estado'=>$estado ]
         ];
     }
+
 
     /** Obtiene eventos del rango visible inicial (semana actual) sin AJAX */
     private function bootstrap_events(){
@@ -61,7 +70,13 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
                 ],
             ]);
             $events = [];
-            foreach( $q->posts as $pid ){ $events[] = $this->build_event($pid); }
+            foreach( $q->posts as $pid ){
+    $event = $this->build_event($pid);
+    if($event !== null){
+        $events[] = $event;
+    }
+}
+
             return $events;
         } catch ( Exception $e ){
             return [];

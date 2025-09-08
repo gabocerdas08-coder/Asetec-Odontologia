@@ -4,6 +4,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 if ( ! class_exists('ASETEC_ODO_Shortcode_Admin_Agenda_Lite') ) {
 
 class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
+
     public function __construct(){
         add_shortcode( 'odo_admin_agenda2', [ $this, 'render' ] );
     }
@@ -13,12 +14,10 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
             return '<p>No autorizado.</p>';
         }
 
-        // Variables necesarias para AJAX
         $ajax  = esc_url( admin_url('admin-ajax.php') );
         $nonce = esc_attr( wp_create_nonce('asetec_odo_admin') );
 
         ob_start(); ?>
-<!— ASETEC Agenda Lite —>
 <style>
   .odo-calendar .fc { --fc-border-color:#e5e7eb; font-family: Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; }
   .odo-calendar .fc-timegrid-slot-label { font-size:12px; color:#374151; }
@@ -27,8 +26,6 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
   .odo-calendar .fc-event { border-radius:10px; padding:2px 6px; font-size:12px; }
   .odo-calendar .fc-timegrid-slot { height:1.6em; }
   .odo-calendar { min-height:640px; }
-
-  /* Modal */
   .odo-modal { position:fixed; inset:0; z-index:9999; display:none; }
   .odo-modal.is-open { display:block; }
   .odo-modal__backdrop { position:absolute; inset:0; background:rgba(15,23,42,.45); }
@@ -49,7 +46,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
 </style>
 
 <div class="wrap modulo-asetec">
-  <h2>Agenda Odontología (Lite)</h2>
+  <h2>Agenda Odontología</h2>
   <div id="odo-calendar" class="odo-calendar"></div>
 </div>
 
@@ -114,45 +111,28 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
   </div>
 </div>
 
-<!-- JQuery (WP suele ya tenerlo; por si acaso lo cargamos de CDN sin bloquear el render) -->
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js" defer></script>
-<!-- FullCalendar v6 (JS y CSS) -->
+<!-- CDN -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css" />
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 
 <script>
 (function(){
-  // Datos de AJAX y nonce embebidos desde PHP
-  var ODO = {
-    ajax: '<?php echo $ajax; ?>',
-    nonce: '<?php echo $nonce; ?>',
-    i18n: {
-      create_title:'Nueva cita', edit_title:'Cita'
-    }
-  };
+  var ODO = { ajax:'<?php echo $ajax; ?>', nonce:'<?php echo $nonce; ?>' };
 
-  // Esperar a que carguen los scripts defer
-  function ready(cb){
-    if(document.readyState === 'complete' || document.readyState === 'interactive'){ cb(); }
-    else document.addEventListener('DOMContentLoaded', cb);
+  function estadoColor(s){
+    return { pendiente:'#f59e0b', aprobada:'#3b82f6', realizada:'#10b981',
+             cancelada_usuario:'#ef4444', cancelada_admin:'#ef4444', reprogramada:'#8b5cf6' }[s] || '#64748b';
   }
+  function toLocalInput(dtStr){ if(!dtStr) return ''; return dtStr.replace(' ', 'T').slice(0,16); }
+  function fromLocalInput(val){ if(!val) return ''; return val.replace('T',' ') + ':00'; }
+  function openModal(title){ document.getElementById('odo-modal-title').textContent = title||''; var m=document.getElementById('odo-modal'); m.classList.add('is-open'); m.setAttribute('aria-hidden','false'); }
+  function closeModal(){ var m=document.getElementById('odo-modal'); m.classList.remove('is-open'); m.setAttribute('aria-hidden','true'); var f=document.getElementById('odo-form'); if(f) f.reset(); document.getElementById('odo_post_id').value=''; document.getElementById('odo_estado').value=''; document.getElementById('odo-btn-save').style.display=''; document.getElementById('odo-btn-update').style.display='none'; }
 
-  ready(function(){
+  document.addEventListener('DOMContentLoaded', function(){
     try {
       var calEl = document.getElementById('odo-calendar');
       if(!calEl){ console.error('ASETEC ODO LITE: no hay #odo-calendar'); return; }
       if(typeof FullCalendar === 'undefined'){ console.error('ASETEC ODO LITE: FullCalendar no cargó'); return; }
-
-      function estadoColor(s){
-        return {
-          pendiente:'#f59e0b', aprobada:'#3b82f6', realizada:'#10b981',
-          cancelada_usuario:'#ef4444', cancelada_admin:'#ef4444', reprogramada:'#8b5cf6'
-        }[s] || '#64748b';
-      }
-      function toLocalInput(dtStr){ if(!dtStr) return ''; return dtStr.replace(' ', 'T').slice(0,16); }
-      function fromLocalInput(val){ if(!val) return ''; return val.replace('T',' ') + ':00'; }
-      function openModal(title){ document.getElementById('odo-modal-title').textContent = title||''; document.getElementById('odo-modal').classList.add('is-open'); document.getElementById('odo-modal').setAttribute('aria-hidden','false'); }
-      function closeModal(){ document.getElementById('odo-modal').classList.remove('is-open'); document.getElementById('odo-modal').setAttribute('aria-hidden','true'); var f=document.getElementById('odo-form'); if(f) f.reset(); document.getElementById('odo_post_id').value=''; document.getElementById('odo_estado').value=''; document.getElementById('odo-btn-save').style.display=''; document.getElementById('odo-btn-update').style.display='none'; }
 
       document.getElementById('odo-btn-close').addEventListener('click', closeModal);
       document.querySelector('.odo-modal__backdrop').addEventListener('click', closeModal);
@@ -171,21 +151,15 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
         slotLabelFormat: { hour: '2-digit', minute: '2-digit', hour12: false },
         eventMinHeight: 22,
         headerToolbar: { left:'prev,next today', center:'title', right:'dayGridMonth,timeGridWeek,timeGridDay' },
-
         selectable: true,
         editable: true,
 
-        // Carga por rango visible
         datesSet: function(arg){
           var payload = new URLSearchParams();
-          payload.set('action','asetec_odo_events');
-          payload.set('nonce', ODO.nonce);
-          payload.set('start', arg.startStr);
-          payload.set('end', arg.endStr);
-
+          payload.set('action','asetec_odo_events'); payload.set('nonce', ODO.nonce);
+          payload.set('start', arg.startStr);        payload.set('end', arg.endStr);
           fetch(ODO.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload })
-            .then(function(r){ return r.json(); })
-            .then(function(r){
+            .then(r=>r.json()).then(function(r){
               if(!r || !r.success || !r.data || !Array.isArray(r.data.events)){ console.warn('ASETEC ODO LITE: eventos inválidos', r); return; }
               var evs = r.data.events.map(function(ev){
                 var est = ev.extendedProps && ev.extendedProps.estado;
@@ -205,20 +179,16 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
           document.getElementById('odo_estado').value= 'pendiente';
           document.getElementById('odo-btn-save').style.display='';
           document.getElementById('odo-btn-update').style.display='none';
-          openModal(ODO.i18n.create_title);
+          openModal('Nueva cita');
         },
 
         eventClick: function(info){
           var id = info.event.extendedProps && info.event.extendedProps.post_id;
           if(!id) return;
           var payload = new URLSearchParams();
-          payload.set('action','asetec_odo_show');
-          payload.set('nonce', ODO.nonce);
-          payload.set('id', id);
-
+          payload.set('action','asetec_odo_show'); payload.set('nonce', ODO.nonce); payload.set('id', id);
           fetch(ODO.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload })
-            .then(function(r){ return r.json(); })
-            .then(function(r){
+            .then(r=>r.json()).then(function(r){
               if(!r || !r.success){ alert((r && r.data && r.data.msg) || 'Error'); return; }
               var d = r.data || {};
               document.getElementById('odo_post_id').value = id;
@@ -231,7 +201,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
               document.getElementById('odo_estado').value  = d.estado || '';
               document.getElementById('odo-btn-save').style.display='none';
               document.getElementById('odo-btn-update').style.display='';
-              openModal(ODO.i18n.edit_title);
+              openModal('Cita');
             })
             .catch(function(e){ alert('Error al cargar la cita'); console.error('ASETEC ODO LITE: fallo show', e); });
         },
@@ -242,11 +212,8 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
           var end   = (info.event.endStr||'').replace('Z','');
           if(!id || !start){ info.revert(); return; }
           var payload = new URLSearchParams();
-          payload.set('action','asetec_odo_reschedule');
-          payload.set('nonce', ODO.nonce);
-          payload.set('id', id);
-          payload.set('start', start);
-          payload.set('end', end);
+          payload.set('action','asetec_odo_reschedule'); payload.set('nonce', ODO.nonce);
+          payload.set('id', id); payload.set('start', start); payload.set('end', end);
           fetch(ODO.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload })
             .then(r=>r.json()).then(function(r){ if(!r.success){ alert((r.data&&r.data.msg)||'No se pudo reprogramar'); info.revert(); return; } cal.refetchEvents(); })
             .catch(function(){ alert('Error al reprogramar'); info.revert(); });
@@ -258,11 +225,8 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
           var end   = info.event.endStr.replace('Z','');
           if(!id || !start || !end){ info.revert(); return; }
           var payload = new URLSearchParams();
-          payload.set('action','asetec_odo_reschedule');
-          payload.set('nonce', ODO.nonce);
-          payload.set('id', id);
-          payload.set('start', start);
-          payload.set('end', end);
+          payload.set('action','asetec_odo_reschedule'); payload.set('nonce', ODO.nonce);
+          payload.set('id', id); payload.set('start', start); payload.set('end', end);
           fetch(ODO.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload })
             .then(r=>r.json()).then(function(r){ if(!r.success){ alert((r.data&&r.data.msg)||'No se pudo ajustar'); info.revert(); return; } cal.refetchEvents(); })
             .catch(function(){ alert('Error al ajustar'); info.revert(); });
@@ -274,8 +238,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
       // Botones modal
       document.getElementById('odo-btn-save').addEventListener('click', function(){
         var payload = new URLSearchParams();
-        payload.set('action','asetec_odo_create');
-        payload.set('nonce', ODO.nonce);
+        payload.set('action','asetec_odo_create'); payload.set('nonce', ODO.nonce);
         payload.set('start', fromLocalInput(document.getElementById('odo_start').value));
         payload.set('end',   fromLocalInput(document.getElementById('odo_end').value));
         payload.set('nombre', document.getElementById('odo_nombre').value);
@@ -290,8 +253,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
       document.getElementById('odo-btn-update').addEventListener('click', function(){
         var id = document.getElementById('odo_post_id').value; if(!id) return;
         var payload = new URLSearchParams();
-        payload.set('action','asetec_odo_reschedule');
-        payload.set('nonce', ODO.nonce);
+        payload.set('action','asetec_odo_reschedule'); payload.set('nonce', ODO.nonce);
         payload.set('id', id);
         payload.set('start', fromLocalInput(document.getElementById('odo_start').value));
         payload.set('end',   fromLocalInput(document.getElementById('odo_end').value));
@@ -303,8 +265,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
       document.getElementById('odo-btn-approve').addEventListener('click', function(){
         var id = document.getElementById('odo_post_id').value; if(!id) return;
         var payload = new URLSearchParams();
-        payload.set('action','asetec_odo_approve');
-        payload.set('nonce', ODO.nonce);
+        payload.set('action','asetec_odo_approve'); payload.set('nonce', ODO.nonce);
         payload.set('id', id);
         fetch(ODO.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload })
           .then(r=>r.json()).then(function(r){ if(!r.success){ alert((r.data&&r.data.msg)||'Error'); return; } closeModal(); cal.refetchEvents(); });
@@ -314,8 +275,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
         var id = document.getElementById('odo_post_id').value; if(!id) return;
         if(!confirm('¿Seguro que desea cancelar esta cita?')) return;
         var payload = new URLSearchParams();
-        payload.set('action','asetec_odo_cancel');
-        payload.set('nonce', ODO.nonce);
+        payload.set('action','asetec_odo_cancel'); payload.set('nonce', ODO.nonce);
         payload.set('id', id);
         fetch(ODO.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload })
           .then(r=>r.json()).then(function(r){ if(!r.success){ alert((r.data&&r.data.msg)||'Error'); return; } closeModal(); cal.refetchEvents(); });
@@ -324,8 +284,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
       document.getElementById('odo-btn-done').addEventListener('click', function(){
         var id = document.getElementById('odo_post_id').value; if(!id) return;
         var payload = new URLSearchParams();
-        payload.set('action','asetec_odo_mark_done');
-        payload.set('nonce', ODO.nonce);
+        payload.set('action','asetec_odo_mark_done'); payload.set('nonce', ODO.nonce);
         payload.set('id', id);
         fetch(ODO.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:payload })
           .then(r=>r.json()).then(function(r){ if(!r.success){ alert((r.data&&r.data.msg)||'Error'); return; } closeModal(); cal.refetchEvents(); });
@@ -342,4 +301,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
     }
 }
 
-} // class_exists
+}
+
+// ✅ Instancia automática del shortcode (no hace falta tocar tu boot())
+new ASETEC_ODO_Shortcode_Admin_Agenda_Lite();

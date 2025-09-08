@@ -190,12 +190,27 @@
       const addMinutes = (d, m)=> { const x=new Date(d); x.setMinutes(x.getMinutes()+m); return x; };
 
       // Cargar TUI JS si hiciera falta
-      const TUI_SRC = 'https://uicdn.toast.com/calendar/latest/toastui-calendar.min.js';
-      injectScript(TUI_SRC).then(()=> this.initCalendar(calEl, sh, {modal, showToast}))
-      .catch(err=>{
+    const TUI_SRC = 'https://uicdn.toast.com/calendar/latest/toastui-calendar.min.js';
+        injectScript(TUI_SRC).then(() => {
+        // Espera a que el objeto esté disponible
+        const ok = () => (window.toastui && window.toastui.Calendar);
+        let tries = 0;
+        (function wait(){
+            if (ok()) {
+            this.initCalendar(calEl, sh, { modal, showToast });
+            return;
+            }
+            if (++tries > 100) {
+            calEl.innerHTML = '<p style="padding:12px;color:#b91c1c">No se pudo cargar el calendario.</p>';
+            console.error('TUI Calendar no cargó');
+            return;
+            }
+            setTimeout(wait.bind(this), 50);
+        }).call(this);
+        }).catch(err => {
         calEl.innerHTML = '<p style="padding:12px;color:#b91c1c">No se pudo cargar el calendario.</p>';
         console.error(err);
-      });
+        });
 
       // Toolbar handlers
       sh.getElementById('odo2-search').addEventListener('input', (e)=>{

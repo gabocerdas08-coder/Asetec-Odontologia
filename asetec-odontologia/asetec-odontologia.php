@@ -68,6 +68,8 @@ final class ASETEC_Odontologia {
         $this->safe_include('includes/class-states.php');
         $this->safe_include('includes/class-settings.php');
         $this->safe_include('includes/class-availability.php');
+        $this->safe_include('includes/class-shortcode-admin-agenda-lite.php');
+
 
         // Emails (antes de endpoints que los usan)
         $this->safe_include('includes/class-emails.php');

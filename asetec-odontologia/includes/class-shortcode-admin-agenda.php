@@ -14,12 +14,26 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
     }
 
     public function assets( $hook = '' ){
-        // Asumimos que ya usabas FullCalendar por CDN o como sea; no lo tocamos.
-        // Solo aseguramos nuestro JS y datos.
+        // FullCalendar v6 por CDN (HTTPS) — evita Mixed Content
+        wp_register_style(
+            'fc-core',
+            'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css',
+            [],
+            '6.1.15'
+        );
+        wp_register_script(
+            'fc-core',
+            'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js',
+            [],
+            '6.1.15',
+            true
+        );
+
+        // Nuestro JS depende de fc-core para garantizar orden de carga
         wp_register_script(
             'asetec-odo-admin',
             ASETEC_ODO_URL . 'assets/js/admin-agenda.js',
-            [ 'jquery' ],
+            [ 'jquery', 'fc-core' ],
             ASETEC_Odontologia::VERSION,
             true
         );
@@ -43,12 +57,13 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
     public function render(){
         if ( ! current_user_can( 'manage_options' ) ) return '<p>No autorizado.</p>';
 
-        // Encolamos SOLO nuestro JS (asumiendo que tu cola de FullCalendar ya existe y funciona).
+        // Encolamos FullCalendar + nuestro JS
+        wp_enqueue_style('fc-core');
+        wp_enqueue_script('fc-core');
         wp_enqueue_script('asetec-odo-admin');
 
         ob_start(); ?>
         <style>
-          /* Limpia y compacta: NO tocamos CSS global ni añadimos archivos extra */
           .odo-calendar .fc { --fc-border-color:#e5e7eb; font-family: Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; }
           .odo-calendar .fc-timegrid-slot-label { font-size:12px; color:#374151; }
           .odo-calendar .fc-toolbar-title { font-weight:700; letter-spacing:0.2px; }
@@ -57,7 +72,6 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
           .odo-calendar .fc-timegrid-slot { height:1.6em; }
           .odo-calendar { min-height:640px; }
 
-          /* Modal minimal, sin dependencias */
           .odo-modal { position:fixed; inset:0; z-index:9999; display:none; }
           .odo-modal.is-open { display:block; }
           .odo-modal__backdrop { position:absolute; inset:0; background:rgba(15,23,42,.45); }
@@ -82,7 +96,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
             <div id="odo-calendar" class="odo-calendar"></div>
         </div>
 
-        <!-- Modal (creación/gestión) -->
+        <!-- Modal -->
         <div id="odo-modal" class="odo-modal" aria-hidden="true">
           <div class="odo-modal__backdrop"></div>
           <div class="odo-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="odo-modal-title">

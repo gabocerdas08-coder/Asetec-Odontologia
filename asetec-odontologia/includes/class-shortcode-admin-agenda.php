@@ -14,7 +14,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
     }
 
     public function assets( $hook = '' ){
-        // FullCalendar por CDN (https)
+        // FullCalendar (https)
         wp_register_style(
             'fc-core',
             'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css',
@@ -29,7 +29,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
             true
         );
 
-        // Nuestro JS depende de fc-core
+        // Nuestro JS
         wp_register_script(
             'asetec-odo-admin',
             ASETEC_ODO_URL . 'assets/js/admin-agenda.js',
@@ -41,21 +41,6 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
         wp_localize_script( 'asetec-odo-admin', 'ASETEC_ODO_ADMIN', [
             'ajax'  => admin_url('admin-ajax.php'),
             'nonce' => wp_create_nonce('asetec_odo_admin'),
-            'i18n'  => [
-                'create_title' => __('Nueva cita', 'asetec-odontologia'),
-                'edit_title'   => __('Cita', 'asetec-odontologia'),
-                'approve'      => __('Aprobar', 'asetec-odontologia'),
-                'cancel'       => __('Cancelar', 'asetec-odontologia'),
-                'done'         => __('Realizada', 'asetec-odontologia'),
-                'save'         => __('Guardar', 'asetec-odontologia'),
-                'update'       => __('Actualizar', 'asetec-odontologia'),
-                'close'        => __('Cerrar', 'asetec-odontologia'),
-                'search_ph'    => __('Buscar por nombre o cédula…', 'asetec-odontologia'),
-                'new_btn'      => __('Nueva cita', 'asetec-odontologia'),
-                'duration'     => __('Duración', 'asetec-odontologia'),
-                'minutes'      => __('min', 'asetec-odontologia'),
-                'reason'       => __('Motivo (opcional)', 'asetec-odontologia'),
-            ]
         ] );
     }
 
@@ -68,17 +53,17 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
 
         ob_start(); ?>
         <style>
-          .odo-toolbar-wrap{ position:sticky; top:10px; z-index:5; background:#fff; border-radius:14px; box-shadow:0 6px 24px rgba(0,0,0,.06); padding:10px 12px; margin:6px 0 12px; }
-          .odo-toolbar { display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center; }
+          /* Controles */
+          .odo-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:8px 0 14px; }
           .odo-legend { display:flex; gap:12px; flex-wrap:wrap; font-size:12px; color:#374151; }
           .odo-legend .dot { width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px; vertical-align:middle; }
-          .odo-controls { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:flex-end; }
           .odo-filters { display:flex; gap:8px; flex-wrap:wrap; font-size:12px; }
           .odo-filters label { display:inline-flex; gap:6px; align-items:center; background:#f3f4f6; padding:6px 8px; border-radius:10px; border:1px solid #e5e7eb; cursor:pointer; }
-          .odo-search { min-width:220px; border:1px solid #d1d5db; border-radius:10px; padding:8px 10px; }
-          .odo-btn-primary { background:#1d4ed8; color:#fff; border:1px solid #1d4ed8; border-radius:10px; padding:8px 12px; cursor:pointer; }
-          .odo-btn-primary:hover { background:#1e40af; }
+          .odo-search { min-width:260px; border:1px solid #d1d5db; border-radius:10px; padding:8px 10px; }
+          .odo-btn-primary { background:#d97706; color:#fff; border:1px solid #d97706; border-radius:10px; padding:8px 12px; cursor:pointer; }
+          .odo-btn-primary:hover { background:#b45309; }
 
+          /* Calendar */
           .odo-calendar .fc { --fc-border-color:#e5e7eb; font-family: Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; }
           .odo-calendar .fc-timegrid-slot-label { font-size:12px; color:#374151; }
           .odo-calendar .fc-toolbar-title { font-weight:700; letter-spacing:0.2px; }
@@ -87,11 +72,13 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
           .odo-calendar .fc-timegrid-slot { height:1.6em; }
           .odo-calendar { min-height:640px; }
 
+          /* Chips */
           .odo-chip { display:inline-block; padding:1px 6px; border-radius:999px; font-size:10px; line-height:1.6; color:#fff; margin-right:6px; }
           .chip-pendiente{background:#f59e0b} .chip-aprobada{background:#3b82f6} .chip-realizada{background:#10b981}
           .chip-cancelada_usuario,.chip-cancelada_admin{background:#ef4444} .chip-reprogramada{background:#8b5cf6}
 
-          .odo-modal { position:fixed; inset:0; z-index:9999; display:none; }
+          /* Modal robusto (va en <body>) */
+          .odo-modal { position:fixed; inset:0; z-index:100000; display:none; }
           .odo-modal.is-open { display:block; }
           .odo-modal__backdrop { position:absolute; inset:0; background:rgba(15,23,42,.45); }
           .odo-modal__dialog { position:relative; max-width:760px; margin:6vh auto; background:#fff; border-radius:14px; box-shadow:0 20px 60px rgba(0,0,0,.25); overflow:hidden; }
@@ -109,42 +96,39 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
           .odo-btn--danger  { background:#b91c1c; color:#fff; border-color:#b91c1c; } .odo-btn--danger:hover  { background:#991b1b; }
           .odo-btn--warn    { background:#059669; color:#fff; border-color:#059669; } .odo-btn--warn:hover    { background:#047857; }
 
-          .odo-toast { position:fixed; right:14px; bottom:14px; background:#111827; color:#fff; padding:10px 12px; border-radius:10px; font-size:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); opacity:0; transform:translateY(10px); transition:all .2s ease; z-index:99999; }
+          .odo-toast { position:fixed; right:14px; bottom:14px; background:#111827; color:#fff; padding:10px 12px; border-radius:10px; font-size:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); opacity:0; transform:translateY(10px); transition:all .2s ease; z-index:100001; }
           .odo-toast.show{ opacity:1; transform:translateY(0); }
         </style>
 
         <div class="wrap modulo-asetec">
           <h2><?php esc_html_e('Agenda Odontología', 'asetec-odontologia'); ?></h2>
 
-          <div class="odo-toolbar-wrap">
-            <div class="odo-toolbar">
-              <div class="odo-legend">
-                <span><i class="dot" style="background:#f59e0b"></i> Pendiente</span>
-                <span><i class="dot" style="background:#3b82f6"></i> Aprobada</span>
-                <span><i class="dot" style="background:#10b981"></i> Realizada</span>
-                <span><i class="dot" style="background:#ef4444"></i> Cancelada</span>
-                <span><i class="dot" style="background:#8b5cf6"></i> Reprogramada</span>
-              </div>
-              <div class="odo-controls">
-                <input id="odo-search" class="odo-search" type="search" placeholder="<?php echo esc_attr__('Buscar por nombre o cédula…','asetec-odontologia'); ?>" />
-                <button id="odo-btn-new" class="odo-btn-primary"><?php esc_html_e('Nueva cita','asetec-odontologia'); ?></button>
-              </div>
+          <div class="odo-toolbar">
+            <div class="odo-legend">
+              <span><i class="dot" style="background:#f59e0b"></i> Pendiente</span>
+              <span><i class="dot" style="background:#3b82f6"></i> Aprobada</span>
+              <span><i class="dot" style="background:#10b981"></i> Realizada</span>
+              <span><i class="dot" style="background:#ef4444"></i> Cancelada</span>
+              <span><i class="dot" style="background:#8b5cf6"></i> Reprogramada</span>
             </div>
-            <div class="odo-filters" id="odo-filters">
-              <?php
-                $estados = ['pendiente','aprobada','realizada','cancelada_usuario','cancelada_admin','reprogramada'];
-                foreach($estados as $e){
-                  $label = ucwords(str_replace('_',' ', $e));
-                  echo '<label><input type="checkbox" class="odo-filter" value="'.esc_attr($e).'" checked> '.esc_html($label).'</label>';
-                }
-              ?>
-            </div>
+            <input id="odo-search" class="odo-search" type="search" placeholder="<?php echo esc_attr__('Buscar por nombre o cédula…','asetec-odontologia'); ?>" />
+            <button id="odo-btn-new" class="odo-btn-primary"><?php esc_html_e('Nueva cita','asetec-odontologia'); ?></button>
+          </div>
+
+          <div class="odo-filters" id="odo-filters">
+            <?php
+              $estados = ['pendiente','aprobada','realizada','cancelada_usuario','cancelada_admin','reprogramada'];
+              foreach($estados as $e){
+                $label = ucwords(str_replace('_',' ', $e));
+                echo '<label><input type="checkbox" class="odo-filter" value="'.esc_attr($e).'" checked> '.esc_html($label).'</label>';
+              }
+            ?>
           </div>
 
           <div id="odo-calendar" class="odo-calendar"></div>
         </div>
 
-        <!-- Modal -->
+        <!-- Modal (se moverá a <body> con JS para evitar conflictos del tema) -->
         <div id="odo-modal" class="odo-modal" aria-hidden="true">
           <div class="odo-modal__backdrop"></div>
           <div class="odo-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="odo-modal-title">
@@ -168,12 +152,12 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
 
                 <div class="odo-grid">
                   <div class="odo-field">
-                    <label><?php esc_html_e('Duración','asetec-odontologia'); ?></label>
+                    <label><?php esc_html_e('Duración (min)','asetec-odontologia'); ?></label>
                     <select id="odo_duration">
-                      <option value="20">20 <?php esc_html_e('min','asetec-odontologia'); ?></option>
-                      <option value="30">30 <?php esc_html_e('min','asetec-odontologia'); ?></option>
-                      <option value="40" selected>40 <?php esc_html_e('min','asetec-odontologia'); ?></option>
-                      <option value="60">60 <?php esc_html_e('min','asetec-odontologia'); ?></option>
+                      <option value="20">20</option>
+                      <option value="30">30</option>
+                      <option value="40" selected>40</option>
+                      <option value="60">60</option>
                       <option value="custom">Custom…</option>
                     </select>
                   </div>
@@ -203,11 +187,6 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
                     <label><?php esc_html_e('Teléfono','asetec-odontologia'); ?></label>
                     <input type="tel" id="odo_telefono" required>
                   </div>
-                </div>
-
-                <div class="odo-field">
-                  <label><?php esc_html_e('Motivo (opcional)','asetec-odontologia'); ?></label>
-                  <textarea id="odo_motivo" placeholder="<?php esc_attr_e('Descripción breve','asetec-odontologia'); ?>"></textarea>
                 </div>
 
                 <div class="odo-field">

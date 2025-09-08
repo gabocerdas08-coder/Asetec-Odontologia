@@ -1,5 +1,10 @@
 (function($){
   $(function(){
+
+    // Mover modal a <body> para evitar clipping / z-index con Wooffice/Elementor
+    var $modal = $('#odo-modal');
+    if($modal.length){ $modal.appendTo('body'); }
+
     var el = document.getElementById('odo-calendar');
     if(!el){ console.warn('ASETEC ODO: #odo-calendar no existe'); return; }
     if (typeof window.FullCalendar === 'undefined') {
@@ -23,31 +28,7 @@
     function estadoColor(s){ return { pendiente:'#f59e0b', aprobada:'#3b82f6', realizada:'#10b981', cancelada_usuario:'#ef4444', cancelada_admin:'#ef4444', reprogramada:'#8b5cf6' }[s] || '#64748b'; }
     function estadoChipClass(s){ return 'chip-' + (s||'').replace('_','_'); }
 
-    // Redondear a próximo múltiplo de 10 min
-    function roundToNext10(date){
-      var d = new Date(date);
-      d.setSeconds(0,0);
-      var m = d.getMinutes();
-      var extra = (10 - (m % 10)) % 10;
-      d.setMinutes(m + extra);
-      return d;
-    }
-    // Sum minutes
-    function addMinutes(date, mins){
-      var d = new Date(date); d.setMinutes(d.getMinutes() + mins); return d;
-    }
-    // Prefill siguiente slot útil
-    function defaultStartEnd(){
-      var now = roundToNext10(new Date());
-      var startHour = 7, endHour = 20; // business hours base
-      if (now.getHours() < startHour) now.setHours(startHour,0,0,0);
-      if (now.getHours() >= endHour) { // pasa al siguiente día hábil
-        now.setDate(now.getDate()+1); now.setHours(startHour,0,0,0);
-      }
-      var dur = getDurationMinutes(); // default (40)
-      var end = addMinutes(now, dur);
-      return { start: now, end: end };
-    }
+    // Duración dinámica
     function getDurationMinutes(){
       var v = $('#odo_duration').val();
       if(v === 'custom'){
@@ -56,15 +37,35 @@
       }
       return parseInt(v,10) || 40;
     }
+    function addMinutes(date, mins){
+      var d = new Date(date); d.setMinutes(d.getMinutes() + mins); return d;
+    }
+    function roundToNext10(date){
+      var d = new Date(date);
+      d.setSeconds(0,0);
+      var m = d.getMinutes();
+      var extra = (10 - (m % 10)) % 10;
+      d.setMinutes(m + extra);
+      return d;
+    }
+    function defaultStartEnd(){
+      var now = roundToNext10(new Date());
+      var startHour = 7, endHour = 20;
+      if (now.getHours() < startHour) now.setHours(startHour,0,0,0);
+      if (now.getHours() >= endHour) { now.setDate(now.getDate()+1); now.setHours(startHour,0,0,0); }
+      var dur = getDurationMinutes();
+      return { start: now, end: addMinutes(now, dur) };
+    }
     function recalcEndFromStart(){
       var sVal = $('#odo_start').val();
       if(!sVal) return;
       var dur = getDurationMinutes();
       var end = addMinutes(new Date(sVal.replace('T',' ')), dur);
-      $('#odo_end').val(toLocalInput(end.toISOString().slice(0,19).replace('T',' ')));
+      var iso = end.toISOString().slice(0,19).replace('T',' ');
+      $('#odo_end').val(toLocalInput(iso));
     }
     $('#odo_duration').on('change', function(){
-      if(this.value === 'custom'){ $('#odo_custom_wrap').show(); } else { $('#odo_custom_wrap').hide(); }
+      $('#odo_custom_wrap').toggle(this.value === 'custom');
       recalcEndFromStart();
     });
     $('#odo_custom_minutes,#odo_start').on('input change', recalcEndFromStart);
@@ -74,34 +75,24 @@
     $(document).on('change','.odo-filter', function(){
       var v = this.value;
       if(this.checked) estadosVisibles.add(v); else estadosVisibles.delete(v);
-      calendar.refetchEvents();
+      calendar.refetchEvents(); // trigger refresh para todas las vistas
     });
 
     // —— búsqueda cliente ——
     var searchQuery = '';
     $('#odo-search').on('input', function(){
       searchQuery = (this.value || '').toLowerCase().trim();
-      // refrescamos rendering sin pegar al servidor
-      calendar.getEvents().forEach(function(ev){
-        var title = (ev.title||'').toLowerCase();
-        var ci    = (ev.extendedProps && (ev.extendedProps.cedula||'')).toLowerCase();
-        var match = !searchQuery || title.includes(searchQuery) || ci.includes(searchQuery);
-        // Simplemente ocultamos/mostramos
-        var el = ev._def && ev._def.ui && ev._def.ui.el; // no público, pero FullCalendar expone el DOM al render
-        if (ev.el) { ev.el.style.display = match ? '' : 'none'; }
-      });
+      calendar.rerenderEvents(); // forzar eventDidMount con nuestro filtro
     });
 
-    // Encuentra primer evento del día para scrollTime
-    function firstEventHourToday(events){
-      var now = new Date();
-      var todayEvents = events.filter(function(e){
-        return e.start && (new Date(e.start)).toDateString() === now.toDateString();
-      });
-      if(!todayEvents.length) return '08:00:00';
-      var first = todayEvents.sort(function(a,b){ return new Date(a.start) - new Date(b.start); })[0];
-      var h = new Date(first.start).getHours().toString().padStart(2,'0');
-      return h+':00:00';
+    // Lógica de visibilidad unificada
+    function applyVisibility(event, el){
+      var est = (event.extendedProps && event.extendedProps.estado) || '';
+      var title = (event.title || '');
+      var ci = (event.extendedProps && event.extendedProps.cedula) || '';
+      var matchEstado = estadosVisibles.has(est || '');
+      var matchQuery  = !searchQuery || title.toLowerCase().includes(searchQuery) || ci.toLowerCase().includes(searchQuery);
+      el.style.display = (matchEstado && matchQuery) ? '' : 'none';
     }
 
     // —— Calendar ——
@@ -122,7 +113,47 @@
       eventMinHeight: 22,
       expandRows: true,
 
-      // Doble click en la grilla para nueva cita
+      events: function(info, success, failure){
+        $.post(ASETEC_ODO_ADMIN.ajax, {
+          action:'asetec_odo_events', nonce:ASETEC_ODO_ADMIN.nonce,
+          start:info.startStr, end:info.endStr
+        }, function(res){
+          if(!res || !res.success || !res.data){ failure('Error'); return; }
+          var evs = (res.data.events || []).map(function(ev){
+            var est = ev.extendedProps && ev.extendedProps.estado;
+            if(est){ ev.backgroundColor = estadoColor(est); ev.borderColor = ev.backgroundColor; }
+            ev.display='block';
+            return ev;
+          });
+          success(evs);
+        }).fail(function(){ failure('AJAX falló'); });
+      },
+
+      // chips + aplicar filtros/búsqueda en cada render
+      eventContent: function(arg){
+        var est = (arg.event.extendedProps && arg.event.extendedProps.estado) || '';
+        var nombre = (arg.event.title || '').trim() || '(Sin nombre)';
+        var chip = $('<span class="odo-chip '+estadoChipClass(est)+'"></span>').text(est.replace('_',' '));
+        var name = $('<span></span>').text(' '+nombre);
+        var $wrap = $('<div></div>').append(chip).append(name);
+        return { domNodes:[ $wrap.get(0) ] };
+      },
+      eventDidMount: function(info){
+        applyVisibility(info.event, info.el);
+      },
+
+      selectable: true,
+      select: function(sel){
+        var now = new Date();
+        if (sel.start < now) { toast('No puede crear citas en el pasado'); return; }
+        $('#odo_start').val( toLocalInput(sel.startStr.replace('Z','').replace('T',' ')) );
+        $('#odo_end').val( toLocalInput(sel.endStr  .replace('Z','').replace('T',' ')) );
+        $('#odo_estado').val('pendiente');
+        $('#odo-btn-approve,#odo-btn-done,#odo-btn-cancel').hide();
+        $('#odo-btn-save').show(); $('#odo-btn-update').hide();
+        openModal('Nueva cita');
+      },
+
       dateClick: function(info){
         if(info.view.type.indexOf('timeGrid') === -1) return;
         var d = new Date(info.date);
@@ -133,63 +164,9 @@
         $('#odo_estado').val('pendiente');
         $('#odo-btn-approve,#odo-btn-done,#odo-btn-cancel').hide();
         $('#odo-btn-save').show(); $('#odo-btn-update').hide();
-        openModal(ASETEC_ODO_ADMIN.i18n.create_title);
+        openModal('Nueva cita');
       },
 
-      // Eventos desde tu endpoint con filtro por estado
-      events: function(info, success, failure){
-        $.post(ASETEC_ODO_ADMIN.ajax, {
-          action:'asetec_odo_events', nonce:ASETEC_ODO_ADMIN.nonce,
-          start:info.startStr, end:info.endStr
-        }, function(res){
-          if(!res || !res.success || !res.data){ failure('Error'); return; }
-          var evs = (res.data.events || [])
-            .filter(function(ev){
-              var est = ev.extendedProps && ev.extendedProps.estado;
-              return estadosVisibles.has(est || '');
-            })
-            .map(function(ev){
-              var est = ev.extendedProps && ev.extendedProps.estado;
-              if(est){ ev.backgroundColor = estadoColor(est); ev.borderColor = ev.backgroundColor; }
-              ev.display='block';
-              return ev;
-            });
-
-          // scrollTime sugerido
-          var st = firstEventHourToday(evs);
-          calendar.setOption('scrollTime', st);
-
-          success(evs);
-
-          // aplicar búsqueda al render actual
-          if (searchQuery) $('#odo-search').trigger('input');
-        }).fail(function(){ failure('AJAX falló'); });
-      },
-
-      // Render rico: chip de estado + nombre
-      eventContent: function(arg){
-        var est = (arg.event.extendedProps && arg.event.extendedProps.estado) || '';
-        var nombre = (arg.event.title || '').trim() || '(Sin nombre)';
-        var chip = $('<span class="odo-chip '+estadoChipClass(est)+'"></span>').text(est.replace('_',' '));
-        var name = $('<span></span>').text(' '+nombre);
-        var $wrap = $('<div></div>').append(chip).append(name);
-        return { domNodes:[ $wrap.get(0) ] };
-      },
-
-      // Crear por selección (arrastrar)
-      selectable: true,
-      select: function(sel){
-        var now = new Date();
-        if (sel.start < now) { toast('No puede crear citas en el pasado'); return; }
-        $('#odo_start').val( toLocalInput(sel.startStr.replace('Z','').replace('T',' ')) );
-        $('#odo_end').val( toLocalInput(sel.endStr  .replace('Z','').replace('T',' ')) );
-        $('#odo_estado').val('pendiente');
-        $('#odo-btn-approve,#odo-btn-done,#odo-btn-cancel').hide();
-        $('#odo-btn-save').show(); $('#odo-btn-update').hide();
-        openModal(ASETEC_ODO_ADMIN.i18n.create_title);
-      },
-
-      // Abrir modal con datos
       eventClick: function(info){
         var id = info.event.extendedProps && info.event.extendedProps.post_id;
         if(!id) return;
@@ -204,16 +181,14 @@
           $('#odo_cedula').val( d.cedula || '' );
           $('#odo_correo').val( d.correo || '' );
           $('#odo_telefono').val( d.telefono || '' );
-          $('#odo_motivo').val( d.motivo || '' ); // si tu endpoint lo devuelve, se mostrará
           $('#odo_estado').val( d.estado || '' );
           $('#odo-btn-save').hide(); $('#odo-btn-update').show();
           $('#odo-btn-approve,#odo-btn-done,#odo-btn-cancel').show();
-          openModal(ASETEC_ODO_ADMIN.i18n.edit_title);
+          openModal('Cita');
         })
         .fail(function(xhr){ alert('Error al cargar la cita'); console.error('ASETEC ODO: fallo show', xhr.status); });
       },
 
-      // Drag/resize conservados
       editable: true,
       eventDrop: function(info){
         var id = info.event.extendedProps && info.event.extendedProps.post_id;
@@ -239,7 +214,7 @@
 
     calendar.render();
 
-    // ——— Botón Nueva cita ———
+    // Botón "Nueva cita"
     $('#odo-btn-new').on('click', function(){
       var t = defaultStartEnd();
       var startISO = toLocalInput(t.start.toISOString().slice(0,19).replace('T',' '));
@@ -249,10 +224,10 @@
       $('#odo_estado').val('pendiente');
       $('#odo-btn-approve,#odo-btn-done,#odo-btn-cancel').hide();
       $('#odo-btn-save').show(); $('#odo-btn-update').hide();
-      openModal(ASETEC_ODO_ADMIN.i18n.create_title);
+      openModal('Nueva cita');
     });
 
-    // ——— Acciones del modal ———
+    // Acciones del modal
     $('#odo-btn-save').on('click', function(){
       var payload = {
         action:'asetec_odo_create', nonce:ASETEC_ODO_ADMIN.nonce,
@@ -261,8 +236,7 @@
         nombre: $('#odo_nombre').val(),
         cedula: $('#odo_cedula').val(),
         correo: $('#odo_correo').val(),
-        telefono: $('#odo_telefono').val(),
-        motivo: $('#odo_motivo').val()
+        telefono: $('#odo_telefono').val()
       };
       $.post(ASETEC_ODO_ADMIN.ajax, payload, function(r){
         if(!r.success){ alert(r.data && r.data.msg || 'No se pudo crear'); return; }
@@ -307,5 +281,6 @@
         closeModal(); toast('Marcada como realizada'); calendar.refetchEvents();
       });
     });
+
   });
 })(jQuery);

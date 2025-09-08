@@ -14,7 +14,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
     }
 
     public function assets( $hook = '' ){
-        // FullCalendar v6 por CDN (HTTPS) — evita Mixed Content
+        // FullCalendar por CDN (https) + nuestro JS con dependencia explícita
         wp_register_style(
             'fc-core',
             'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/main.min.css',
@@ -29,7 +29,6 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
             true
         );
 
-        // Nuestro JS depende de fc-core para garantizar orden de carga
         wp_register_script(
             'asetec-odo-admin',
             ASETEC_ODO_URL . 'assets/js/admin-agenda.js',
@@ -57,20 +56,29 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
     public function render(){
         if ( ! current_user_can( 'manage_options' ) ) return '<p>No autorizado.</p>';
 
-        // Encolamos FullCalendar + nuestro JS
         wp_enqueue_style('fc-core');
         wp_enqueue_script('fc-core');
         wp_enqueue_script('asetec-odo-admin');
 
         ob_start(); ?>
         <style>
+          .odo-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 0 8px; }
+          .odo-legend { display:flex; gap:10px; flex-wrap:wrap; font-size:12px; color:#374151; }
+          .odo-legend .dot { width:10px; height:10px; border-radius:999px; display:inline-block; margin-right:6px; vertical-align:middle; }
+          .odo-filters { display:flex; gap:8px; flex-wrap:wrap; font-size:12px; }
+          .odo-filters label { display:inline-flex; gap:6px; align-items:center; background:#f3f4f6; padding:6px 8px; border-radius:10px; border:1px solid #e5e7eb; cursor:pointer; }
+          .odo-filters input { accent-color:#1d4ed8; }
           .odo-calendar .fc { --fc-border-color:#e5e7eb; font-family: Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif; }
           .odo-calendar .fc-timegrid-slot-label { font-size:12px; color:#374151; }
           .odo-calendar .fc-toolbar-title { font-weight:700; letter-spacing:0.2px; }
           .odo-calendar .fc-button { border-radius:10px; padding:6px 10px; }
-          .odo-calendar .fc-event { border-radius:10px; padding:2px 6px; font-size:12px; }
+          .odo-calendar .fc-event { border-radius:10px; padding:0 6px; font-size:12px; }
           .odo-calendar .fc-timegrid-slot { height:1.6em; }
           .odo-calendar { min-height:640px; }
+
+          .odo-chip { display:inline-block; padding:1px 6px; border-radius:999px; font-size:10px; line-height:1.6; color:#fff; margin-right:6px; }
+          .chip-pendiente{background:#f59e0b} .chip-aprobada{background:#3b82f6} .chip-realizada{background:#10b981}
+          .chip-cancelada_usuario,.chip-cancelada_admin{background:#ef4444} .chip-reprogramada{background:#8b5cf6}
 
           .odo-modal { position:fixed; inset:0; z-index:9999; display:none; }
           .odo-modal.is-open { display:block; }
@@ -86,14 +94,36 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
           .odo-btn { appearance:none; border:1px solid #d1d5db; background:#fff; color:#111827; padding:8px 12px; border-radius:10px; cursor:pointer; }
           .odo-btn:hover { background:#f3f4f6; }
           .odo-btn--primary { background:#1d4ed8; color:#fff; border-color:#1d4ed8; } .odo-btn--primary:hover { background:#1e40af; }
-          .odo-btn--danger { background:#b91c1c; color:#fff; border-color:#b91c1c; } .odo-btn--danger:hover { background:#991b1b; }
-          .odo-btn--warn { background:#059669; color:#fff; border-color:#059669; } .odo-btn--warn:hover { background:#047857; }
-          .odo-btn--ghost { background:transparent; border:none; font-size:18px; color:#6b7280; } .odo-btn--ghost:hover { color:#111827; }
+          .odo-btn--danger  { background:#b91c1c; color:#fff; border-color:#b91c1c; } .odo-btn--danger:hover  { background:#991b1b; }
+          .odo-btn--warn    { background:#059669; color:#fff; border-color:#059669; } .odo-btn--warn:hover    { background:#047857; }
+
+          .odo-toast { position:fixed; right:14px; bottom:14px; background:#111827; color:#fff; padding:10px 12px; border-radius:10px; font-size:12px; box-shadow:0 10px 30px rgba(0,0,0,.25); opacity:0; transform:translateY(10px); transition:all .2s ease; z-index:99999; }
+          .odo-toast.show{ opacity:1; transform:translateY(0); }
         </style>
 
         <div class="wrap modulo-asetec">
-            <h2><?php esc_html_e('Agenda Odontología', 'asetec-odontologia'); ?></h2>
-            <div id="odo-calendar" class="odo-calendar"></div>
+          <h2><?php esc_html_e('Agenda Odontología', 'asetec-odontologia'); ?></h2>
+
+          <div class="odo-toolbar">
+            <div class="odo-legend">
+              <span><i class="dot" style="background:#f59e0b"></i> Pendiente</span>
+              <span><i class="dot" style="background:#3b82f6"></i> Aprobada</span>
+              <span><i class="dot" style="background:#10b981"></i> Realizada</span>
+              <span><i class="dot" style="background:#ef4444"></i> Cancelada</span>
+              <span><i class="dot" style="background:#8b5cf6"></i> Reprogramada</span>
+            </div>
+            <div class="odo-filters" id="odo-filters">
+              <?php
+                $estados = ['pendiente','aprobada','realizada','cancelada_usuario','cancelada_admin','reprogramada'];
+                foreach($estados as $e){
+                  $label = ucwords(str_replace('_',' ', $e));
+                  echo '<label><input type="checkbox" class="odo-filter" value="'.esc_attr($e).'" checked> '.esc_html($label).'</label>';
+                }
+              ?>
+            </div>
+          </div>
+
+          <div id="odo-calendar" class="odo-calendar"></div>
         </div>
 
         <!-- Modal -->
@@ -102,7 +132,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
           <div class="odo-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="odo-modal-title">
             <div class="odo-modal__header">
               <h3 id="odo-modal-title"></h3>
-              <button type="button" class="odo-btn odo-btn--ghost" id="odo-btn-close">✕</button>
+              <button type="button" class="odo-btn" id="odo-btn-close">✕</button>
             </div>
             <div class="odo-modal__body">
               <form id="odo-form">
@@ -156,6 +186,8 @@ class ASETEC_ODO_Shortcode_Admin_Agenda {
             </div>
           </div>
         </div>
+
+        <div id="odo-toast" class="odo-toast" role="status" aria-live="polite"></div>
         <?php
         return ob_get_clean();
     }

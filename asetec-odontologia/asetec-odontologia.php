@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ASETEC Odontología
  * Description: Gestión de citas odontológicas (slots editables, reservas, agenda admin, dashboard y correos .ics).
- * Version: 0.3.3
+ * Version: 0.3.5
  * Author: ASETEC
  * Text Domain: asetec-odontologia
  */

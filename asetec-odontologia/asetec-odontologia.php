@@ -9,7 +9,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 final class ASETEC_Odontologia {
-    const VERSION = '0.3.5';
+    const VERSION = '0.3.6';
     private static $instance = null;
 
     /** Feature flags (puedes activar más adelante) */
@@ -68,7 +68,7 @@ final class ASETEC_Odontologia {
         $this->safe_include('includes/class-states.php');
         $this->safe_include('includes/class-settings.php');
         $this->safe_include('includes/class-availability.php');
-        $this->safe_include('includes/class-shortcode-admin-agenda-lite.php');
+        
 
 
         // Emails (antes de endpoints que los usan)
@@ -86,6 +86,7 @@ final class ASETEC_Odontologia {
         if ( self::ENABLE_AGENDA ) {
             $this->safe_include('includes/class-shortcode-admin-agenda.php');
             $this->safe_include('includes/class-admin-endpoints.php'); // AJAX admin
+            $this->safe_include('includes/class-shortcode-admin-agenda-lite.php');
         }
 
         // Dashboard / reportes (opcional)

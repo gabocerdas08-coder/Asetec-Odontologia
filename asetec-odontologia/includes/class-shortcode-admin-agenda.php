@@ -1,11 +1,11 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! class_exists('ASETEC_ODO_Shortcode_Admin_Agenda_Lite') ) {
+if ( ! class_exists('ASETEC_ODO_Shortcode_Admin_Agenda') ) {
 
-class ASETEC_ODO_Shortcode_Admin_Agenda_Lite {
+class ASETEC_ODO_Shortcode_Admin_Agenda {
     public function __construct(){
-        add_shortcode( 'odo_admin_agenda2', [ $this, 'render' ] );
+        add_shortcode( 'odo_admin_agenda', [ $this, 'render' ] );
     }
 
     public function render(){

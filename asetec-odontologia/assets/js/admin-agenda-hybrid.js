@@ -3,7 +3,7 @@
     return ({pendiente:'#f59e0b', aprobada:'#3b82f6', realizada:'#10b981', cancelada_usuario:'#ef4444', cancelada_admin:'#ef4444', reprogramada:'#8b5cf6'}[s] || '#64748b');
   }
   function fmtDT(v){ if(!v) return ''; const d=new Date(v); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
-  function toast(msg){ const el = document.getElementById('odo3-toast'); el.textContent = msg || ''; el.style.opacity = 1; el.style.transform = 'translateY(0)'; setTimeout(()=>{ el.style.opacity=0; el.style.transform='translateY(10px)'; }, 1700); }
+  function toast(msg){ const el = document.getElementById('odo3-toast'); el.textContent = msg || ''; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'), 1700); }
 
   $(function(){
     const calEl    = document.getElementById('odo3-calendar');
@@ -23,25 +23,23 @@
       estado:   document.getElementById('odo3-estado'),
     };
 
-    let currentId = null;
+    let currentId = null; // ID real (post_id)
 
-    function openModal(){ modal.style.display='block'; }
-    function closeModal(){ modal.style.display='none'; currentId=null; }
+    function openModal(){ modal.classList.add('open'); modal.setAttribute('aria-hidden','false'); }
+    function closeModal(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); currentId=null; }
     closeBtn.addEventListener('click', closeModal);
-    modal.querySelector('.backdrop').addEventListener('click', closeModal);
+    modal.querySelector('.odo3-backdrop').addEventListener('click', closeModal);
 
-    // Toolbar
+    // Barra superior
     const inputSearch = document.getElementById('odo3-search');
     const btnNew      = document.getElementById('odo3-new');
+    const viewBtns    = document.querySelectorAll('.odo3-view');
+
+    // Filtros
     const chkFilters  = document.querySelectorAll('.odo3-filter');
+    const getFilters = ()=>{ const set=new Set(); chkFilters.forEach(c=>{ if(c.checked) set.add(c.value); }); return set; };
 
-    function getFilters(){
-      const set = new Set();
-      chkFilters.forEach(c=>{ if(c.checked) set.add(c.value); });
-      return set;
-    }
-
-    // Calendario (FullCalendar)
+    // Calendario
     const calendar = new FullCalendar.Calendar(calEl, {
       initialView: 'timeGridWeek',
       slotMinTime: '07:00:00',
@@ -65,15 +63,22 @@
           const res = await fetch(ASETEC_ODO_ADMIN3.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
           const j = await res.json();
           if(!j.success) throw new Error(j?.data?.msg || 'Error eventos');
+
           const q = (inputSearch.value || '').toLowerCase();
           const filt = getFilters();
+
           const mapped = (j.data?.events || []).map(ev=>{
-            const estado = ev.extendedProps?.estado || '';
+            const props  = ev.extendedProps || {};
+            const estado = props.estado || '';
+            // ⚠️ ID real: forzamos post_id (lo que espera el backend)
+            const pid = String(props.post_id || ev.id || '');
+
             return {
-              id: String(ev.id || ev.extendedProps?.post_id || ''),
+              id: pid,
               title: ev.title || '',
-              start: ev.start, end: ev.end,
-              extendedProps: Object.assign({}, ev.extendedProps||{}),
+              start: ev.start,
+              end:   ev.end,
+              extendedProps: props,
               backgroundColor: colorByEstado(estado),
               borderColor: colorByEstado(estado)
             };
@@ -84,12 +89,13 @@
             const okQ = !q || text.includes(q);
             return okEstado && okQ;
           });
+
           success(mapped);
         }catch(err){ console.error(err); failure(err); }
       },
 
       select: (selInfo)=>{
-        // Crear cita: prellenar y abrir modal
+        // Crear cita
         currentId = null;
         titleEl.textContent = 'Nueva cita';
         F.start.value = fmtDT(selInfo.start);
@@ -101,36 +107,38 @@
 
       eventClick: async (arg)=>{
         try{
+          // ⚠️ usamos siempre el id tal como mapeamos (post_id)
           const id = arg.event.id;
+          if(!id){ toast('ID no válido'); return; }
           currentId = id;
           titleEl.textContent = 'Editar cita';
-          // cargar detalle
+
           const body = new URLSearchParams({ action:'asetec_odo_show', nonce:ASETEC_ODO_ADMIN3.nonce, id });
           const res  = await fetch(ASETEC_ODO_ADMIN3.ajax,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
           const j    = await res.json();
           if(!j.success) throw new Error(j?.data?.msg || 'Error');
 
           const d = j.data || {};
-          F.start.value = fmtDT(d.start || arg.event.start);
-          F.end.value   = fmtDT(d.end   || arg.event.end);
+          F.start.value    = fmtDT(d.start || arg.event.start);
+          F.end.value      = fmtDT(d.end   || arg.event.end);
           F.nombre.value   = d.paciente_nombre || arg.event.title || '';
           F.cedula.value   = d.paciente_cedula || '';
           F.correo.value   = d.paciente_correo || '';
           F.telefono.value = d.paciente_telefono || '';
           F.estado.value   = d.estado || arg.event.extendedProps?.estado || 'pendiente';
+
           openModal();
         }catch(e){ console.error(e); toast('No se pudo cargar la cita'); }
       },
 
       eventDrop: async (arg)=>{
-        // Reprogramación por drag & drop
         try{
           const body = new URLSearchParams({
             action:'asetec_odo_reschedule',
             nonce: ASETEC_ODO_ADMIN3.nonce,
             id: arg.event.id,
             start: arg.event.start.toISOString(),
-            end: arg.event.end ? arg.event.end.toISOString() : ''
+            end:   arg.event.end ? arg.event.end.toISOString() : ''
           });
           const res = await fetch(ASETEC_ODO_ADMIN3.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
           const j = await res.json();
@@ -142,18 +150,17 @@
       },
 
       eventResize: async (arg)=>{
-        // Reprogramación por resize
         try{
           const body = new URLSearchParams({
             action:'asetec_odo_reschedule',
             nonce: ASETEC_ODO_ADMIN3.nonce,
             id: arg.event.id,
             start: arg.event.start.toISOString(),
-            end: arg.event.end ? arg.event.end.toISOString() : ''
+            end:   arg.event.end ? arg.event.end.toISOString() : ''
           });
           const res = await fetch(ASETEC_ODO_ADMIN3.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
           const j = await res.json();
-          if(!j.success) throw new Error(j?.data?.msg || 'Error reprogramar');
+          if(!j.success) throw new Error(j?.data?.msg || 'Error actualizar');
           toast('Cita actualizada');
         }catch(e){
           console.error(e); arg.revert(); toast('No se pudo actualizar');
@@ -162,6 +169,15 @@
     });
 
     calendar.render();
+
+    // Cambiar vista
+    viewBtns.forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        viewBtns.forEach(b=>b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        calendar.changeView(btn.getAttribute('data-view'));
+      });
+    });
 
     // Filtros y búsqueda
     inputSearch.addEventListener('input', ()=> calendar.refetchEvents());
@@ -180,7 +196,6 @@
 
     // Acciones modal
     document.getElementById('odo3-save').addEventListener('click', async ()=>{
-      // Crear
       try{
         const body = new URLSearchParams({
           action:'asetec_odo_create',
@@ -194,13 +209,11 @@
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
         const j = await res.json();
         if(!j.success) throw new Error(j?.data?.msg || 'Error crear');
-        toast('Cita creada');
-        closeModal(); calendar.refetchEvents();
+        toast('Cita creada'); closeModal(); calendar.refetchEvents();
       }catch(e){ console.error(e); toast('No se pudo crear'); }
     });
 
     document.getElementById('odo3-update').addEventListener('click', async ()=>{
-      // Actualizar datos básicos + reprogramar si cambió fecha
       if(!currentId) return;
       try{
         const body = new URLSearchParams({
@@ -216,8 +229,7 @@
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
         const j = await res.json();
         if(!j.success) throw new Error(j?.data?.msg || 'Error actualizar');
-        toast('Cita actualizada');
-        closeModal(); calendar.refetchEvents();
+        toast('Cita actualizada'); closeModal(); calendar.refetchEvents();
       }catch(e){ console.error(e); toast('No se pudo actualizar'); }
     });
 
@@ -228,8 +240,7 @@
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
         const j = await res.json();
         if(!j.success) throw new Error(j?.data?.msg || 'Error aprobar');
-        toast('Cita aprobada');
-        closeModal(); calendar.refetchEvents();
+        toast('Cita aprobada'); closeModal(); calendar.refetchEvents();
       }catch(e){ console.error(e); toast('No se pudo aprobar'); }
     });
 
@@ -240,8 +251,7 @@
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
         const j = await res.json();
         if(!j.success) throw new Error(j?.data?.msg || 'Error marcar realizada');
-        toast('Marcada como realizada');
-        closeModal(); calendar.refetchEvents();
+        toast('Marcada como realizada'); closeModal(); calendar.refetchEvents();
       }catch(e){ console.error(e); toast('No se pudo marcar'); }
     });
 
@@ -252,8 +262,7 @@
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
         const j = await res.json();
         if(!j.success) throw new Error(j?.data?.msg || 'Error cancelar');
-        toast('Cita cancelada');
-        closeModal(); calendar.refetchEvents();
+        toast('Cita cancelada'); closeModal(); calendar.refetchEvents();
       }catch(e){ console.error(e); toast('No se pudo cancelar'); }
     });
 

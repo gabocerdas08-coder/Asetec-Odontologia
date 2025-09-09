@@ -14,11 +14,14 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Hybrid {
     }
 
     public function assets(){
-        // Usa tus assets locales de FullCalendar (ya los tienes en /assets/fullcalendar/)
+        // FullCalendar (locales que ya tenías)
         wp_register_style( 'fc-core', ASETEC_ODO_URL.'assets/fullcalendar/fullcalendar.min.css', [], '6.1.0' );
         wp_register_script('fc-core', ASETEC_ODO_URL.'assets/fullcalendar/fullcalendar.min.js',  [], '6.1.0', true );
 
-        // Nuestro JS híbrido (depende de FullCalendar)
+        // CSS de la agenda (estética)
+        wp_register_style( 'asetec-odo-admin-agenda', ASETEC_ODO_URL.'assets/css/admin-agenda.css', [], ASETEC_Odontologia::VERSION );
+
+        // JS híbrido
         wp_register_script(
             'asetec-odo-admin-hybrid',
             ASETEC_ODO_URL.'assets/js/admin-agenda-hybrid.js',
@@ -57,29 +60,35 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Hybrid {
         }
 
         wp_enqueue_style('fc-core');
+        wp_enqueue_style('asetec-odo-admin-agenda');
         wp_enqueue_script('fc-core');
         wp_enqueue_script('asetec-odo-admin-hybrid');
 
         ob_start(); ?>
-        <div class="wrap modulo-asetec">
-            <h2><?php esc_html_e('Agenda Odontología', 'asetec-odontologia'); ?></h2>
+        <div class="odo3-wrap">
+            <h2 class="odo3-title"><?php esc_html_e('Agenda Odontología', 'asetec-odontologia'); ?></h2>
 
-            <div class="odo3-toolbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:10px 0 12px">
-                <div class="legend" style="display:flex;gap:10px;font-size:12px;color:#374151;flex-wrap:wrap">
-                    <span><i style="width:10px;height:10px;border-radius:999px;background:#f59e0b;display:inline-block;margin-right:6px"></i> <?php esc_html_e('Pendiente','asetec-odontologia'); ?></span>
-                    <span><i style="width:10px;height:10px;border-radius:999px;background:#3b82f6;display:inline-block;margin-right:6px"></i> <?php esc_html_e('Aprobada','asetec-odontologia'); ?></span>
-                    <span><i style="width:10px;height:10px;border-radius:999px;background:#10b981;display:inline-block;margin-right:6px"></i> <?php esc_html_e('Realizada','asetec-odontologia'); ?></span>
-                    <span><i style="width:10px;height:10px;border-radius:999px;background:#ef4444;display:inline-block;margin-right:6px"></i> <?php esc_html_e('Cancelada','asetec-odontologia'); ?></span>
-                    <span><i style="width:10px;height:10px;border-radius:999px;background:#8b5cf6;display:inline-block;margin-right:6px"></i> <?php esc_html_e('Reprogramada','asetec-odontologia'); ?></span>
+            <div class="odo3-toolbar">
+                <div class="odo3-legend">
+                    <span><i class="odo3-dot" style="background:#f59e0b"></i> <?php esc_html_e('Pendiente','asetec-odontologia'); ?></span>
+                    <span><i class="odo3-dot" style="background:#3b82f6"></i> <?php esc_html_e('Aprobada','asetec-odontologia'); ?></span>
+                    <span><i class="odo3-dot" style="background:#10b981"></i> <?php esc_html_e('Realizada','asetec-odontologia'); ?></span>
+                    <span><i class="odo3-dot" style="background:#ef4444"></i> <?php esc_html_e('Cancelada','asetec-odontologia'); ?></span>
+                    <span><i class="odo3-dot" style="background:#8b5cf6"></i> <?php esc_html_e('Reprogramada','asetec-odontologia'); ?></span>
                 </div>
 
-                <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                    <input id="odo3-search" type="search" placeholder="<?php echo esc_attr__('Buscar (nombre o cédula)…','asetec-odontologia'); ?>" style="min-width:240px;border:1px solid #d1d5db;border-radius:10px;padding:8px 10px">
-                    <button id="odo3-new" class="button button-primary"><?php esc_html_e('Nueva cita','asetec-odontologia'); ?></button>
+                <div class="odo3-actions">
+                    <div class="odo3-viewgroup" role="group" aria-label="<?php esc_attr_e('Cambiar vista','asetec-odontologia'); ?>">
+                        <button class="odo3-view" data-view="dayGridMonth">Mes</button>
+                        <button class="odo3-view is-active" data-view="timeGridWeek">Semana</button>
+                        <button class="odo3-view" data-view="timeGridDay">Día</button>
+                    </div>
+                    <input id="odo3-search" class="odo3-search" type="search" placeholder="<?php echo esc_attr__('Buscar (nombre o cédula)…','asetec-odontologia'); ?>">
+                    <button id="odo3-new" class="odo3-btn-primary"><?php esc_html_e('Nueva cita','asetec-odontologia'); ?></button>
                 </div>
             </div>
 
-            <div class="odo3-filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+            <div class="odo3-filters">
                 <?php
                 $estados = [
                     'pendiente'         => __('pendiente','asetec-odontologia'),
@@ -90,32 +99,32 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Hybrid {
                     'reprogramada'      => __('reprogramada','asetec-odontologia'),
                 ];
                 foreach($estados as $val=>$label){
-                    echo '<label style="display:inline-flex;gap:6px;align-items:center;background:#f3f4f6;padding:6px 8px;border-radius:10px;border:1px solid #e5e7eb;cursor:pointer">';
+                    echo '<label class="odo3-chip">';
                     echo '<input class="odo3-filter" type="checkbox" value="'.esc_attr($val).'" checked> '.esc_html($label);
                     echo '</label>';
                 }
                 ?>
             </div>
 
-            <div id="odo3-calendar" style="min-height:640px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden"></div>
+            <div id="odo3-calendar" class="odo3-calendar"></div>
 
             <!-- Modal -->
-            <div id="odo3-modal" style="position:fixed;inset:0;z-index:99999;display:none">
-                <div class="backdrop" style="position:absolute;inset:0;background:rgba(15,23,42,.45)"></div>
-                <div class="dialog" style="position:relative;max-width:760px;margin:6vh auto;background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden">
-                    <div class="header" style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid #e5e7eb">
+            <div id="odo3-modal" class="odo3-modal" aria-hidden="true">
+                <div class="odo3-backdrop"></div>
+                <div class="odo3-dialog" role="dialog" aria-modal="true" aria-labelledby="odo3-modal-title">
+                    <div class="odo3-dialog-head">
                         <strong id="odo3-modal-title">Cita</strong>
-                        <button id="odo3-close" class="button"><?php esc_html_e('Cerrar','asetec-odontologia'); ?></button>
+                        <button id="odo3-close" class="odo3-btn"><?php esc_html_e('Cerrar','asetec-odontologia'); ?></button>
                     </div>
-                    <div class="body" style="padding:16px 18px">
-                        <div class="grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-                            <div class="field"><label><?php esc_html_e('Inicio','asetec-odontologia'); ?></label><input type="datetime-local" id="odo3-start"></div>
-                            <div class="field"><label><?php esc_html_e('Fin','asetec-odontologia'); ?></label><input type="datetime-local" id="odo3-end"></div>
-                            <div class="field"><label><?php esc_html_e('Nombre completo','asetec-odontologia'); ?></label><input id="odo3-nombre" type="text"></div>
-                            <div class="field"><label><?php esc_html_e('Cédula','asetec-odontologia'); ?></label><input id="odo3-cedula" type="text"></div>
-                            <div class="field"><label><?php esc_html_e('Correo','asetec-odontologia'); ?></label><input id="odo3-correo" type="email"></div>
-                            <div class="field"><label><?php esc_html_e('Teléfono','asetec-odontologia'); ?></label><input id="odo3-telefono" type="tel"></div>
-                            <div class="field"><label><?php esc_html_e('Estado','asetec-odontologia'); ?></label>
+                    <div class="odo3-dialog-body">
+                        <div class="odo3-grid">
+                            <div class="odo3-field"><label><?php esc_html_e('Inicio','asetec-odontologia'); ?></label><input type="datetime-local" id="odo3-start"></div>
+                            <div class="odo3-field"><label><?php esc_html_e('Fin','asetec-odontologia'); ?></label><input type="datetime-local" id="odo3-end"></div>
+                            <div class="odo3-field"><label><?php esc_html_e('Nombre completo','asetec-odontologia'); ?></label><input id="odo3-nombre" type="text"></div>
+                            <div class="odo3-field"><label><?php esc_html_e('Cédula','asetec-odontologia'); ?></label><input id="odo3-cedula" type="text"></div>
+                            <div class="odo3-field"><label><?php esc_html_e('Correo','asetec-odontologia'); ?></label><input id="odo3-correo" type="email"></div>
+                            <div class="odo3-field"><label><?php esc_html_e('Teléfono','asetec-odontologia'); ?></label><input id="odo3-telefono" type="tel"></div>
+                            <div class="odo3-field"><label><?php esc_html_e('Estado','asetec-odontologia'); ?></label>
                                 <select id="odo3-estado">
                                     <option value="pendiente"><?php esc_html_e('pendiente','asetec-odontologia'); ?></option>
                                     <option value="aprobada"><?php esc_html_e('aprobada','asetec-odontologia'); ?></option>
@@ -127,21 +136,21 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_Hybrid {
                             </div>
                         </div>
                     </div>
-                    <div class="footer" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 18px;border-top:1px solid #e5e7eb;background:#fafafa">
-                        <div class="actionsL" style="display:flex;gap:8px;flex-wrap:wrap">
-                            <button id="odo3-approve" class="button button-primary"><?php esc_html_e('Aprobar','asetec-odontologia'); ?></button>
-                            <button id="odo3-done" class="button"><?php esc_html_e('Realizada','asetec-odontologia'); ?></button>
-                            <button id="odo3-cancel" class="button button-danger" style="background:#b91c1c;color:#fff;border-color:#b91c1c"><?php esc_html_e('Cancelar','asetec-odontologia'); ?></button>
+                    <div class="odo3-dialog-foot">
+                        <div class="odo3-actionsL">
+                            <button id="odo3-approve" class="odo3-btn-primary"><?php esc_html_e('Aprobar','asetec-odontologia'); ?></button>
+                            <button id="odo3-done" class="odo3-btn-green"><?php esc_html_e('Realizada','asetec-odontologia'); ?></button>
+                            <button id="odo3-cancel" class="odo3-btn-danger"><?php esc_html_e('Cancelar','asetec-odontologia'); ?></button>
                         </div>
-                        <div class="actionsR" style="display:flex;gap:8px;flex-wrap:wrap">
-                            <button id="odo3-save" class="button button-primary"><?php esc_html_e('Guardar','asetec-odontologia'); ?></button>
-                            <button id="odo3-update" class="button"><?php esc_html_e('Actualizar','asetec-odontologia'); ?></button>
+                        <div class="odo3-actionsR">
+                            <button id="odo3-save" class="odo3-btn-primary"><?php esc_html_e('Guardar','asetec-odontologia'); ?></button>
+                            <button id="odo3-update" class="odo3-btn"><?php esc_html_e('Actualizar','asetec-odontologia'); ?></button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div id="odo3-toast" style="position:fixed;right:14px;bottom:14px;background:#111827;color:#fff;padding:10px 12px;border-radius:10px;font-size:12px;box-shadow:0 10px 30px rgba(0,0,0,.25);opacity:0;transform:translateY(10px);transition:all .2s;z-index:999999"></div>
+            <div id="odo3-toast" class="odo3-toast"></div>
         </div>
         <?php
         return ob_get_clean();

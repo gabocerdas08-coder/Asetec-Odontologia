@@ -351,3 +351,31 @@ if (backdrop) backdrop.addEventListener('click', closeModal);
 
   });
 })(jQuery);
+
+async function parseJsonOrText(res){
+  try { return await res.json(); } catch(e){
+    const txt = await res.text();
+    throw new Error(txt || ('HTTP '+res.status));
+  }
+}
+
+// Ejemplo de uso en aprobar/cancelar/update/etc:
+async function aprobarCita(body) {
+  const res = await fetch(ASETEC_ODO_ADMIN3.ajax, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body
+  });
+  let j;
+  try {
+    j = await parseJsonOrText(res);
+    if (!res.ok || !j.success) throw new Error((j && j.data && j.data.msg) || 'Error');
+    // ...procesa éxito...
+  } catch(err){
+    console.error(err);
+    toast(err.message);
+    return;
+  }
+}
+
+// Reemplaza el bloque de fetch/try/catch en aprobar, cancelar, actualizar, etc. por este patrón.

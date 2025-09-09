@@ -1,6 +1,11 @@
 <?php
 if ( ! defined('ABSPATH') ) exit;
 
+// Activá esto mientras depuras; luego ponelo en false
+if ( ! defined('ASETEC_ODO_DEBUG') ) {
+    define('ASETEC_ODO_DEBUG', true);
+}
+
 class ASETEC_ODO_Admin_Endpoints {
 
     public function __construct(){
@@ -69,26 +74,30 @@ class ASETEC_ODO_Admin_Endpoints {
     /* -------------------- Endpoints -------------------- */
 
     public function ajax_show(){
-        try{
+        try {
             $this->require_nonce();
             $id = $this->get_id();
             $p  = $this->get_cita($id);
             if (is_wp_error($p)) return $this->fail($p->get_error_message(), 404);
 
             $data = [
-                'start'             => get_post_meta($id,'fecha_hora_inicio', true),
-                'end'               => get_post_meta($id,'fecha_hora_fin',    true),
-                'paciente_nombre'   => get_post_meta($id,'paciente_nombre',   true),
-                'paciente_cedula'   => get_post_meta($id,'paciente_cedula',   true),
-                'paciente_correo'   => get_post_meta($id,'paciente_correo',   true),
-                'paciente_telefono' => get_post_meta($id,'paciente_telefono', true),
-                'estado'            => get_post_meta($id,'estado',            true),
-                'post_id'           => $id,
+                'start'              => get_post_meta($id,'fecha_hora_inicio', true),
+                'end'                => get_post_meta($id,'fecha_hora_fin',    true),
+                'paciente_nombre'    => get_post_meta($id,'paciente_nombre',   true),
+                'paciente_cedula'    => get_post_meta($id,'paciente_cedula',   true),
+                'paciente_correo'    => get_post_meta($id,'paciente_correo',   true),
+                'paciente_telefono'  => get_post_meta($id,'paciente_telefono', true),
+                'estado'             => get_post_meta($id,'estado',            true),
+                'post_id'            => $id,
             ];
             $this->ok($data);
-        }catch(Throwable $e){
-            error_log('[ASETEC_ODO ajax_show] '.$e->getMessage());
-            $this->fail('Error interno', 500);
+        } catch (Throwable $e) {
+            $msg = 'Error interno';
+            error_log('[ASETEC_ODO ' . __FUNCTION__ . '] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            if (ASETEC_ODO_DEBUG && current_user_can('manage_options')) {
+                $msg .= ': ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine();
+            }
+            $this->fail($msg, 500);
         }
     }
 

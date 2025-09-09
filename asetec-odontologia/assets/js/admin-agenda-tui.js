@@ -197,7 +197,13 @@
         let tries = 0;
         (function wait(){
             if (ok()) {
-           this.initCalendar(calEl, this.shadowRoot, { modal, showToast }, CalendarCtor);
+           ensureTui()
+            .then(CalendarCtor => this.initCalendar(calEl, this.shadowRoot, { modal, showToast }, CalendarCtor))
+            .catch(err => {
+                calEl.innerHTML = '<p style="padding:12px;color:#b91c1c">No se pudo cargar el calendario.</p>';
+                console.error(err);
+            });
+
             return;
             }
             if (++tries > 100) {

@@ -13,56 +13,69 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_TUI {
         add_action( 'admin_enqueue_scripts', [ $this, 'assets' ] );
     }
 
-    public function assets(){
-        // TUI Calendar por CDN (JS + CSS) — se inyectan también desde el Web Component por seguridad,
-        // pero registramos aquí por si el sitio bloquea cargas dinámicas.
-        wp_register_style(
-            'tui-calendar',
-            'https://uicdn.toast.com/calendar/latest/toastui-calendar.min.css',
-            [],
-            'latest'
-        );
-        wp_register_script(
-            'tui-calendar',
-            'https://uicdn.toast.com/calendar/latest/toastui-calendar.min.js',
-            [],
-            'latest',
-            true
-        );
+public function assets(){
+    // 1) Pin de versión estable (evita sorpresas con "latest")
+    $ver = '2.1.3';
 
-        // Nuestro Web Component (no depende de jQuery)
-        wp_register_script(
-            'asetec-odo-admin-tui',
-            ASETEC_ODO_URL . 'assets/js/admin-agenda-tui.js',
-            [],
-            ASETEC_Odontologia::VERSION,
-            true
-        );
+    // 2) CDN primario (jsDelivr) + secundario (TOAST UI CDN)
+    $tui_css_primary = "https://cdn.jsdelivr.net/npm/@toast-ui/calendar@{$ver}/dist/toastui-calendar.min.css";
+    $tui_js_primary  = "https://cdn.jsdelivr.net/npm/@toast-ui/calendar@{$ver}/dist/toastui-calendar.min.js";
 
-        wp_localize_script('asetec-odo-admin-tui', 'ASETEC_ODO_ADMIN2', [
-            'ajax'  => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('asetec_odo_admin'),
-            'labels'=> [
-                'title'     => __('Agenda Odontología', 'asetec-odontologia'),
-                'new'       => __('Nueva cita', 'asetec-odontologia'),
-                'search'    => __('Buscar (nombre o cédula)…', 'asetec-odontologia'),
-                'save'      => __('Guardar', 'asetec-odontologia'),
-                'update'    => __('Actualizar', 'asetec-odontologia'),
-                'approve'   => __('Aprobar', 'asetec-odontologia'),
-                'cancel'    => __('Cancelar', 'asetec-odontologia'),
-                'done'      => __('Realizada', 'asetec-odontologia'),
-                'close'     => __('Cerrar', 'asetec-odontologia'),
-                'start'     => __('Inicio', 'asetec-odontologia'),
-                'end'       => __('Fin', 'asetec-odontologia'),
-                'duration'  => __('Duración (min)', 'asetec-odontologia'),
-                'name'      => __('Nombre completo', 'asetec-odontologia'),
-                'id'        => __('Cédula', 'asetec-odontologia'),
-                'email'     => __('Correo', 'asetec-odontologia'),
-                'phone'     => __('Teléfono', 'asetec-odontologia'),
-                'status'    => __('Estado', 'asetec-odontologia')
-            ]
-        ]);
-    }
+    $tui_css_backup  = "https://uicdn.toast.com/calendar/v{$ver}/toastui-calendar.min.css";
+    $tui_js_backup   = "https://uicdn.toast.com/calendar/v{$ver}/toastui-calendar.min.js";
+
+    // 3) (Opcional) rutas locales — súbelas si tu hosting bloquea CDNs
+    //    assets/vendor/tui/toastui-calendar.min.css y .js
+    $tui_css_local = ASETEC_ODO_URL . 'assets/vendor/tui/toastui-calendar.min.css';
+    $tui_js_local  = ASETEC_ODO_URL . 'assets/vendor/tui/toastui-calendar.min.js';
+
+    // Registramos el primario
+    wp_register_style('tui-calendar',  $tui_css_primary, [], $ver);
+    wp_register_script('tui-calendar', $tui_js_primary,  [], $ver, true);
+
+    // Encolamos un pequeño inline que hace fallback si falla el primario
+    $fallback = "
+    (function(){
+      function have(){return (window.tui && window.tui.Calendar) || (window.toastui && window.toastui.Calendar);}
+      function load(src, cb){
+        var s=document.createElement('script'); s.src=src; s.async=true; s.onload=cb; s.onerror=cb; document.head.appendChild(s);
+      }
+      function loadCss(href){
+        if ([].some.call(document.styleSheets,function(ss){return (ss.href||'').indexOf(href)>-1;})) return;
+        var l=document.createElement('link'); l.rel='stylesheet'; l.href=href; document.head.appendChild(l);
+      }
+      function tryBackup(){
+        if (have()) return;
+        loadCss('{$tui_css_backup}');
+        load('{$tui_js_backup}', function(){
+          if (have()) return;
+          // último intento: local
+          loadCss('{$tui_css_local}');
+          load('{$tui_js_local}', function(){});
+        });
+      }
+      // Si en ~400ms no existe el global, disparamos backup
+      setTimeout(function(){ if(!have()) tryBackup(); }, 400);
+    })();
+    ";
+    wp_add_inline_script('tui-calendar', $fallback);
+
+    // Nuestro Web Component DEPENDE de TUI
+    wp_register_script(
+        'asetec-odo-admin-tui',
+        ASETEC_ODO_URL . 'assets/js/admin-agenda-tui.js',
+        [ 'tui-calendar' ],
+        ASETEC_Odontologia::VERSION,
+        true
+    );
+
+    wp_localize_script('asetec-odo-admin-tui', 'ASETEC_ODO_ADMIN2', [
+        'ajax'  => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('asetec_odo_admin'),
+        'labels'=> [ /* tus labels */ ]
+    ]);
+}
+
 
     public function render(){
         if ( ! current_user_can('manage_options') ) {

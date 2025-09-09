@@ -197,7 +197,7 @@
         let tries = 0;
         (function wait(){
             if (ok()) {
-            this.initCalendar(calEl, sh, { modal, showToast });
+           this.initCalendar(calEl, this.shadowRoot, { modal, showToast }, CalendarCtor);
             return;
             }
             if (++tries > 100) {
@@ -314,6 +314,23 @@
           modal.classList.remove('open'); showToast('Marcada como realizada'); this.reloadRange();
         }).catch(e=> alert(e.message));
       });
+      function getTuiCalendarCtor() {
+        // Soporta ambas variantes de global
+        return (window.toastui && window.toastui.Calendar)
+            || (window.tui && window.tui.Calendar)
+            || null;
+        }
+        function ensureTui(max = 100, delay = 50) {
+        return new Promise((resolve, reject) => {
+            let i = 0;
+            (function tick() {
+            const Ctor = getTuiCalendarCtor();
+            if (Ctor) return resolve(Ctor);
+            if (++i > max) return reject(new Error('TUI Calendar no cargó'));
+            setTimeout(tick, delay);
+            })();
+        });
+        }
 
       // Helpers modal
       this.openCreateModal = (sh)=>{
@@ -350,9 +367,13 @@
       };
     }
 
-    initCalendar(calEl, sh, ui){
-      // eslint-disable-next-line no-undef
-      const Calendar = window.toastui.Calendar;
+        initCalendar(calEl, sh, ui, CalendarCtor) {
+        const Calendar = CalendarCtor || getTuiCalendarCtor();
+        if (!Calendar) {
+            calEl.innerHTML = '<p style="padding:12px;color:#b91c1c">No se pudo inicializar el calendario.</p>';
+            console.error('TUI Calendar constructor no disponible');
+            return;
+        }
 
       const calendar = new Calendar(calEl, {
         defaultView: 'week',

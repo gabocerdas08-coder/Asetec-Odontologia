@@ -8,7 +8,7 @@ class ASETEC_ODO_Shortcode_Admin_Agenda_TUI {
     public static function instance(){ return self::$instance ?? ( self::$instance = new self() ); }
 
     private function __construct(){
-        add_shortcode( 'odo_admin_agenda3', [ $this, 'render' ] );
+        add_shortcode( 'odo_admin_agenda4', [ $this, 'render' ] );
         add_action( 'wp_enqueue_scripts',    [ $this, 'assets' ] );
         add_action( 'admin_enqueue_scripts', [ $this, 'assets' ] );
     }

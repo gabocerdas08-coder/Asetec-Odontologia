@@ -12,6 +12,7 @@ class ASETEC_ODO_Admin_Endpoints {
         add_action( 'wp_ajax_asetec_odo_mark_done',   [ $this, 'mark_done' ] );
         add_action( 'wp_ajax_asetec_odo_create',      [ $this, 'create' ] );
         add_action( 'wp_ajax_asetec_odo_reschedule',  [ $this, 'reschedule' ] );
+        add_action( 'wp_ajax_asetec_odo_show',        [ $this, 'ajax_show' ] ); // <-- Añade esta línea
     }
 
     private function verify_admin(){
@@ -42,13 +43,25 @@ class ASETEC_ODO_Admin_Endpoints {
         foreach ( $q->posts as $pid ){
             $s = get_post_meta($pid,'fecha_hora_inicio',true);
             $f = get_post_meta($pid,'fecha_hora_fin',true);
-            $estado = get_post_meta($pid,'estado',true);
-            $pac = get_post_meta($pid,'paciente_nombre',true);
+            $estado   = get_post_meta($pid,'estado',true);
+            $paciente = get_post_meta($pid,'paciente_nombre',true);
+            $cedula   = get_post_meta($pid,'paciente_cedula',true);
+            $correo   = get_post_meta($pid,'paciente_correo',true);
+            $telefono = get_post_meta($pid,'paciente_telefono',true);
+
             $events[] = [
-                'title' => trim(($pac?:__('Cita','asetec-odontologia')).' ['.$estado.']'),
+                'id'    => (string) $pid,
+                'title' => trim(($paciente ?: __('Cita','asetec-odontologia')).' ['.$estado.']'),
                 'start' => str_replace(' ','T',$s),
                 'end'   => str_replace(' ','T',$f),
-                'extendedProps' => [ 'post_id' => $pid, 'estado'=>$estado ]
+                'extendedProps' => [
+                    'post_id'            => (int)$pid,
+                    'estado'             => $estado,
+                    'paciente_nombre'    => $paciente,
+                    'paciente_cedula'    => $cedula,
+                    'paciente_correo'    => $correo,
+                    'paciente_telefono'  => $telefono,
+                ],
             ];
         }
         wp_send_json_success([ 'events' => $events ]);
@@ -168,6 +181,40 @@ class ASETEC_ODO_Admin_Endpoints {
         }
 
         wp_send_json_success(['msg'=>'Reprogramada']);
+    }
+
+    /** Devuelve los datos completos de la cita para el modal */
+    public function ajax_show(){
+        // 1) Nonce
+        check_ajax_referer( 'asetec_odo_admin', 'nonce' );
+
+        // 2) ID robusto (acepta id o post_id)
+        $id = isset($_POST['id']) ? absint($_POST['id']) : 0;
+        if ( ! $id && isset($_POST['post_id']) ) $id = absint($_POST['post_id']);
+
+        if ( ! $id ) {
+            wp_send_json_error( [ 'msg' => 'Falta id' ], 400 );
+        }
+
+        $p = get_post( $id );
+        if ( ! $p || 'cita_odontologia' !== $p->post_type ) {
+            wp_send_json_error( [ 'msg' => 'Cita no encontrada' ], 404 );
+        }
+
+        // 3) Carga de metadatos
+        $data = [
+            'start'              => get_post_meta($id,'fecha_hora_inicio', true),
+            'end'                => get_post_meta($id,'fecha_hora_fin',    true),
+            'paciente_nombre'    => get_post_meta($id,'paciente_nombre',   true),
+            'paciente_cedula'    => get_post_meta($id,'paciente_cedula',   true),
+            'paciente_correo'    => get_post_meta($id,'paciente_correo',   true),
+            'paciente_telefono'  => get_post_meta($id,'paciente_telefono', true),
+            'estado'             => get_post_meta($id,'estado',            true),
+            'post_id'            => $id,
+        ];
+
+        // 4) Éxito
+        wp_send_json_success( $data );
     }
 }
 

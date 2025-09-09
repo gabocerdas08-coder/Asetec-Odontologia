@@ -166,32 +166,37 @@ if (backdrop) backdrop.addEventListener('click', closeModal);
       headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body
     });
-    const j = await res.json();
 
-    if(j && j.success){
-      const d = j.data || {};
-      if (F.start)    F.start.value    = fmtDT(d.start || e.start);
-      if (F.end)      F.end.value      = fmtDT(d.end   || e.end);
-      if (F.nombre)   F.nombre.value   = d.paciente_nombre || e.title || '';
-      if (F.cedula)   F.cedula.value   = d.paciente_cedula || '';
-      if (F.correo)   F.correo.value   = d.paciente_correo || '';
-      if (F.telefono) F.telefono.value = d.paciente_telefono || '';
-      if (F.estado)   F.estado.value   = d.estado || props.estado || 'pendiente';
+    let j;
+    try { j = await res.json(); } catch(_) { j = null; }
+
+    if (!res.ok || !j || !j.success) {
+      const msg = (j && j.data && j.data.msg) ? j.data.msg : ('HTTP '+res.status);
+      console.warn('asetec_odo_show ERROR:', j || res);
+      // Fallback a extendedProps para no bloquear la edición:
+      if (F.start)    F.start.value    = fmtDT(e.start);
+      if (F.end)      F.end.value      = fmtDT(e.end);
+      if (F.nombre)   F.nombre.value   = props.paciente_nombre || e.title || '';
+      if (F.cedula)   F.cedula.value   = props.paciente_cedula || '';
+      if (F.correo)   F.correo.value   = props.paciente_correo || '';
+      if (F.telefono) F.telefono.value = props.paciente_telefono || '';
+      if (F.estado)   F.estado.value   = props.estado || 'pendiente';
+      currentId = (props.post_id || e.id || null) ? String(props.post_id || e.id) : null;
       openModal();
+      toast('Mostrando datos del calendario ('+msg+')');
       return;
     }
 
-    // 3) Fallback con extendedProps si el endpoint devolvió error
-    console.warn('asetec_odo_show falló, fallback a extendedProps', j);
-    if (F.start)    F.start.value    = fmtDT(e.start);
-    if (F.end)      F.end.value      = fmtDT(e.end);
-    if (F.nombre)   F.nombre.value   = props.paciente_nombre || e.title || '';
-    if (F.cedula)   F.cedula.value   = props.paciente_cedula || '';
-    if (F.correo)   F.correo.value   = props.paciente_correo || '';
-    if (F.telefono) F.telefono.value = props.paciente_telefono || '';
-    if (F.estado)   F.estado.value   = props.estado || 'pendiente';
+    const d = j.data || {};
+    if (F.start)    F.start.value    = fmtDT(d.start || e.start);
+    if (F.end)      F.end.value      = fmtDT(d.end   || e.end);
+    if (F.nombre)   F.nombre.value   = d.paciente_nombre || e.title || '';
+    if (F.cedula)   F.cedula.value   = d.paciente_cedula || '';
+    if (F.correo)   F.correo.value   = d.paciente_correo || '';
+    if (F.telefono) F.telefono.value = d.paciente_telefono || '';
+    if (F.estado)   F.estado.value   = d.estado || props.estado || 'pendiente';
     openModal();
-    toast('Mostrando datos del calendario (no del servidor)');
+    return;
   }catch(err){
     console.error(err);
     toast('No se pudo abrir la cita');

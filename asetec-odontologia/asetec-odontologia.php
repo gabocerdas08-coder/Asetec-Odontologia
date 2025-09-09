@@ -88,8 +88,7 @@ final class ASETEC_Odontologia {
             $this->safe_include('includes/class-admin-endpoints.php'); // AJAX admin
             $this->safe_include('includes/class-shortcode-admin-agenda-lite.php');
             $this->safe_include('includes/class-shortcode-admin-agenda-tui.php');
-            $this->safe_include('includes/class-shortcode-admin-agenda-fc.php');
-
+            
         }
 
         // Dashboard / reportes (opcional)
@@ -117,10 +116,6 @@ final class ASETEC_Odontologia {
         if ( self::ENABLE_AGENDA && class_exists('ASETEC_ODO_Shortcode_Admin_Agenda_TUI') ) {
             ASETEC_ODO_Shortcode_Admin_Agenda_TUI::instance();
         }
-
-        if ( class_exists('ASETEC_ODO_Shortcode_Admin_Agenda_FC') )
-    ASETEC_ODO_Shortcode_Admin_Agenda_FC::instance();
-
 
 
         if ( self::ENABLE_CRON && class_exists('ASETEC_ODO_Cron') )

@@ -20,7 +20,8 @@
     const modal    = document.getElementById('odo3-modal');
     const closeBtn = document.getElementById('odo3-close');
     const titleEl  = document.getElementById('odo3-modal-title');
-    const backdrop = modal ? modal.querySelector('.odo3-backdrop') : null; // <- selector correcto
+    const backdrop =  modal ? modal.querySelector('.odo3-backdrop') : null;
+if (backdrop) backdrop.addEventListener('click', closeModal);
 
     const F = {
       start:    document.getElementById('odo3-start'),

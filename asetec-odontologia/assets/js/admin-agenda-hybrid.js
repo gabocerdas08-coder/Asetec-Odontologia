@@ -133,34 +133,71 @@ if (backdrop) backdrop.addEventListener('click', closeModal);
         openModal();
       },
 
-      eventClick: async (arg)=>{
-        try{
-          const id = arg.event.id; // ya es post_id por nuestro map()
-          if(!id){ toast('ID no válido'); return; }
-          currentId = id;
-          if (titleEl) titleEl.textContent = 'Editar cita';
+ eventClick: async (arg)=>{
+  try{
+    const e     = arg.event;
+    const props = e.extendedProps || {};
 
-          const body = new URLSearchParams({ action:'asetec_odo_show', nonce:ASETEC_ODO_ADMIN3.nonce, id });
-          const res  = await fetch(ASETEC_ODO_ADMIN3.ajax,{
-            method:'POST',
-            headers:{'Content-Type':'application/x-www-form-urlencoded'},
-            body
-          });
-          const j = await res.json();
-          if(!j.success) throw new Error(j?.data?.msg || 'Error');
+    // 1) Resolver ID de forma robusta (lo que espera backend es el post_id)
+    const id = String(e.id || props.post_id || props.ID || '');
+    if(!id){
+      // Sin id: abrimos igual con lo que haya en props
+      if (titleEl) titleEl.textContent = 'Editar cita';
+      if (F.start)    F.start.value    = fmtDT(e.start);
+      if (F.end)      F.end.value      = fmtDT(e.end);
+      if (F.nombre)   F.nombre.value   = props.paciente_nombre || e.title || '';
+      if (F.cedula)   F.cedula.value   = props.paciente_cedula || '';
+      if (F.correo)   F.correo.value   = props.paciente_correo || '';
+      if (F.telefono) F.telefono.value = props.paciente_telefono || '';
+      if (F.estado)   F.estado.value   = props.estado || 'pendiente';
+      currentId = null; // sin id, no permitimos acciones que requieren ID
+      openModal();
+      toast('Cita sin ID – usando datos del calendario');
+      return;
+    }
 
-          const d = j.data || {};
-          if (F.start)    F.start.value    = fmtDT(d.start || arg.event.start);
-          if (F.end)      F.end.value      = fmtDT(d.end   || arg.event.end);
-          if (F.nombre)   F.nombre.value   = d.paciente_nombre || arg.event.title || '';
-          if (F.cedula)   F.cedula.value   = d.paciente_cedula || '';
-          if (F.correo)   F.correo.value   = d.paciente_correo || '';
-          if (F.telefono) F.telefono.value = d.paciente_telefono || '';
-          if (F.estado)   F.estado.value   = d.estado || arg.event.extendedProps?.estado || 'pendiente';
+    currentId = id;
+    if (titleEl) titleEl.textContent = 'Editar cita';
 
-          openModal();
-        }catch(e){ console.error(e); toast('No se pudo cargar la cita'); }
-      },
+    // 2) Intentar cargar desde el servidor
+    const body = new URLSearchParams({ action:'asetec_odo_show', nonce:ASETEC_ODO_ADMIN3.nonce, id });
+    const res  = await fetch(ASETEC_ODO_ADMIN3.ajax,{
+      method:'POST',
+      headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body
+    });
+    const j = await res.json();
+
+    if(j && j.success){
+      const d = j.data || {};
+      if (F.start)    F.start.value    = fmtDT(d.start || e.start);
+      if (F.end)      F.end.value      = fmtDT(d.end   || e.end);
+      if (F.nombre)   F.nombre.value   = d.paciente_nombre || e.title || '';
+      if (F.cedula)   F.cedula.value   = d.paciente_cedula || '';
+      if (F.correo)   F.correo.value   = d.paciente_correo || '';
+      if (F.telefono) F.telefono.value = d.paciente_telefono || '';
+      if (F.estado)   F.estado.value   = d.estado || props.estado || 'pendiente';
+      openModal();
+      return;
+    }
+
+    // 3) Fallback con extendedProps si el endpoint devolvió error
+    console.warn('asetec_odo_show falló, fallback a extendedProps', j);
+    if (F.start)    F.start.value    = fmtDT(e.start);
+    if (F.end)      F.end.value      = fmtDT(e.end);
+    if (F.nombre)   F.nombre.value   = props.paciente_nombre || e.title || '';
+    if (F.cedula)   F.cedula.value   = props.paciente_cedula || '';
+    if (F.correo)   F.correo.value   = props.paciente_correo || '';
+    if (F.telefono) F.telefono.value = props.paciente_telefono || '';
+    if (F.estado)   F.estado.value   = props.estado || 'pendiente';
+    openModal();
+    toast('Mostrando datos del calendario (no del servidor)');
+  }catch(err){
+    console.error(err);
+    toast('No se pudo abrir la cita');
+  }
+},
+
 
       eventDrop: async (arg)=>{
         try{

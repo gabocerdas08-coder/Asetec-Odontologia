@@ -310,10 +310,10 @@ if (backdrop) backdrop.addEventListener('click', closeModal);
           estado: F.estado.value
         });
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
-        const j = await res.json();
-        if(!j.success) throw new Error(j?.data?.msg || 'Error actualizar');
+        const j = await parseJsonOrText(res);
+        if(!res.ok || !j.success) throw new Error((j && j.data && j.data.msg) || 'Error actualizar');
         toast('Cita actualizada'); closeModal(); calendar.refetchEvents();
-      }catch(e){ console.error(e); toast('No se pudo actualizar'); }
+      }catch(e){ console.error(e); toast(e.message); }
     });
 
     if (btnApprove) btnApprove.addEventListener('click', async ()=>{
@@ -321,10 +321,10 @@ if (backdrop) backdrop.addEventListener('click', closeModal);
       try{
         const body = new URLSearchParams({ action:'asetec_odo_approve', nonce:ASETEC_ODO_ADMIN3.nonce, id: currentId });
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
-        const j = await res.json();
-        if(!j.success) throw new Error(j?.data?.msg || 'Error aprobar');
+        const j = await parseJsonOrText(res);
+        if(!res.ok || !j.success) throw new Error((j && j.data && j.data.msg) || 'Error aprobar');
         toast('Cita aprobada'); closeModal(); calendar.refetchEvents();
-      }catch(e){ console.error(e); toast('No se pudo aprobar'); }
+      }catch(e){ console.error(e); toast(e.message); }
     });
 
     if (btnDone) btnDone.addEventListener('click', async ()=>{
@@ -332,8 +332,8 @@ if (backdrop) backdrop.addEventListener('click', closeModal);
       try{
         const body = new URLSearchParams({ action:'asetec_odo_mark_done', nonce:ASETEC_ODO_ADMIN3.nonce, id: currentId });
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
-        const j = await res.json();
-        if(!j.success) throw new Error(j?.data?.msg || 'Error marcar realizada');
+        const j = await parseJsonOrText(res);
+        if(!res.ok || !j.success) throw new Error((j && j.data && j.data.msg) || 'Error marcar realizada');
         toast('Marcada como realizada'); closeModal(); calendar.refetchEvents();
       }catch(e){ console.error(e); toast('No se pudo marcar'); }
     });
@@ -343,10 +343,10 @@ if (backdrop) backdrop.addEventListener('click', closeModal);
       try{
         const body = new URLSearchParams({ action:'asetec_odo_cancel', nonce:ASETEC_ODO_ADMIN3.nonce, id: currentId });
         const res = await fetch(ASETEC_ODO_ADMIN3.ajax,{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body });
-        const j = await res.json();
-        if(!j.success) throw new Error(j?.data?.msg || 'Error cancelar');
+        const j = await parseJsonOrText(res);
+        if(!res.ok || !j.success) throw new Error((j && j.data && j.data.msg) || 'Error cancelar');
         toast('Cita cancelada'); closeModal(); calendar.refetchEvents();
-      }catch(e){ console.error(e); toast('No se pudo cancelar'); }
+      }catch(e){ console.error(e); toast(e.message); }
     });
 
   });

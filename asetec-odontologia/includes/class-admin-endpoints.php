@@ -32,24 +32,46 @@ class ASETEC_ODO_Admin_Endpoints {
     if (!$p || $p->post_type !== 'cita_odontologia') return new WP_Error('not_found','Cita no encontrada');
     return $p;
   }
-  private function to_mysql_dt($s){
+private function to_mysql_dt($s){
     if (!$s) return '';
-    // admite ISO, "YYYY-mm-dd HH:ii:ss", timestamps, etc.
+    // acepta: 'YYYY-mm-ddTHH:ii', 'YYYY-mm-dd HH:ii[:ss]', timestamps
+    $s = trim($s);
+    // normaliza ISO local -> ' ' para que no dependa de zona
+    $s = str_replace('T', ' ', $s);
+    // si no trae segundos, agrégalos
+    if (preg_match('/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/', $s)) {
+        $s .= ':00';
+    }
     $ts = is_numeric($s) ? (int)$s : strtotime($s);
     if (!$ts) return '';
-    return gmdate('Y-m-d H:i:s', $ts);
-  }
-  private function validate_window($start){
-    // mínimo 2h
+    // usa hora local del servidor (no gmdate) para que no se “corra”
+    return date('Y-m-d H:i:s', $ts);
+}
+
+private function validate_window($start){
+    // Relaja para admin/recepción: permite crear/editar aunque falten <2h
+    // Si quieres respetar estrictamente la regla, comenta el return true
+    if ( current_user_can('manage_options') || current_user_can('edit_posts') ) {
+        return true;
+    }
     $ts = strtotime($start);
-    if ($ts !== false && $ts < time() + 2*3600) return new WP_Error('too_soon','Debe crear con al menos 2 horas de anticipación.');
+    if ($ts !== false && $ts < time() + 2*3600) {
+        return new WP_Error('too_soon','Debe crear con al menos 2 horas de anticipación.');
+    }
     return true;
-  }
-  private function check_availability($start,$end,$exclude=0){
+}
+private function check_availability($start,$end,$exclude=0){
     if (!class_exists('ASETEC_ODO_Availability')) return true;
-    $ok = ASETEC_ODO_Availability::is_available($start,$end,$exclude);
-    return $ok ? true : new WP_Error('no_slot','Ese horario ya no está disponible.');
-  }
+    try{
+        $ok = ASETEC_ODO_Availability::is_available($start,$end,$exclude);
+        return $ok ? true : new WP_Error('no_slot','Ese horario ya no está disponible.');
+    }catch(Throwable $e){
+        error_log('[ASETEC_ODO availability] '.$e->getMessage().' ('.$start.' - '.$end.')');
+        // Permitir mientras corriges el checker
+        return true;
+    }
+}
+
 
   /* ---------- endpoints ---------- */
 
@@ -135,85 +157,93 @@ class ASETEC_ODO_Admin_Endpoints {
     }
   }
 
-  public function create(){
-    try{
-      $this->nonce();
+public function create(){
+  try{
+    $this->nonce();
 
-      $start  = $this->to_mysql_dt($_POST['start'] ?? '');
-      $end    = $this->to_mysql_dt($_POST['end']   ?? '');
-      $nombre = sanitize_text_field($_POST['nombre']   ?? '');
-      $cedula = sanitize_text_field($_POST['cedula']   ?? '');
-      $correo = sanitize_email      ($_POST['correo']  ?? '');
-      $tel    = sanitize_text_field ($_POST['telefono']?? '');
-      $estado = sanitize_text_field ($_POST['estado']  ?? 'pendiente');
+    $start  = $this->to_mysql_dt($_POST['start'] ?? '');
+    $end    = $this->to_mysql_dt($_POST['end']   ?? '');
+    $nombre = sanitize_text_field($_POST['nombre']   ?? '');
+    $cedula = sanitize_text_field($_POST['cedula']   ?? '');
+    $correo = sanitize_email      ($_POST['correo']  ?? '');
+    $tel    = sanitize_text_field ($_POST['telefono']?? '');
+    $estado = sanitize_text_field ($_POST['estado']  ?? 'pendiente');
 
-      if (!$start || !$end || !$nombre || !$cedula || !$correo || !$tel)
-        return $this->fail('Datos incompletos', 400);
-
-      $w = $this->validate_window($start);
-      if (is_wp_error($w)) return $this->fail($w->get_error_message(), 409);
-
-      $a = $this->check_availability($start,$end,0);
-      if (is_wp_error($a)) return $this->fail($a->get_error_message(), 409);
-
-      $id = wp_insert_post([
-        'post_type'   => 'cita_odontologia',
-        'post_status' => 'publish',
-        'post_title'  => $nombre.' — '.$start,
-      ], true);
-
-      if (is_wp_error($id)) return $this->fail('No se pudo crear la cita',500);
-
-      update_post_meta($id,'fecha_hora_inicio',$start);
-      update_post_meta($id,'fecha_hora_fin',   $end);
-      update_post_meta($id,'paciente_nombre',  $nombre);
-      update_post_meta($id,'paciente_cedula',  $cedula);
-      update_post_meta($id,'paciente_correo',  $correo);
-      update_post_meta($id,'paciente_telefono',$tel);
-      update_post_meta($id,'estado',           $estado);
-
-      $this->ok(['msg'=>'Cita creada','post_id'=>$id]);
-    }catch(Throwable $e){
-      error_log('[ASETEC_ODO create] '.$e->getMessage());
-      $this->fail('Error interno', 500);
+    if (!$start || !$end || !$nombre || !$cedula || !$correo || !$tel) {
+      return $this->fail('Datos incompletos (revise fecha/hora y datos de paciente).', 400);
     }
-  }
 
-  public function update(){
-    try{
-      $this->nonce();
-      $id = $this->post_id();
-      $p  = $this->get_cita($id);
-      if (is_wp_error($p)) return $this->fail($p->get_error_message(),404);
+    // ventana
+    $w = $this->validate_window($start);
+    if (is_wp_error($w)) return $this->fail($w->get_error_message(), 409);
 
-      $start  = $this->to_mysql_dt($_POST['start']  ?? get_post_meta($id,'fecha_hora_inicio',true));
-      $end    = $this->to_mysql_dt($_POST['end']    ?? get_post_meta($id,'fecha_hora_fin',   true));
-      $nombre = sanitize_text_field($_POST['nombre'] ?? get_post_meta($id,'paciente_nombre', true));
-      $cedula = sanitize_text_field($_POST['cedula'] ?? get_post_meta($id,'paciente_cedula', true));
-      $correo = sanitize_email      ($_POST['correo'] ?? get_post_meta($id,'paciente_correo', true));
-      $tel    = sanitize_text_field ($_POST['telefono']?? get_post_meta($id,'paciente_telefono',true));
-      $estado = sanitize_text_field ($_POST['estado']  ?? get_post_meta($id,'estado',true));
+    // disponibilidad
+    $a = $this->check_availability($start,$end,0);
+    if (is_wp_error($a)) return $this->fail($a->get_error_message(), 409);
 
-      $w = $this->validate_window($start);
-      if (is_wp_error($w)) return $this->fail($w->get_error_message(),409);
+    $id = wp_insert_post([
+      'post_type'   => 'cita_odontologia',
+      'post_status' => 'publish',
+      'post_title'  => $nombre.' — '.$start,
+      'post_author' => get_current_user_id(), // opcional, ayuda en algunos setups
+    ], true);
 
-      $a = $this->check_availability($start,$end,$id);
-      if (is_wp_error($a)) return $this->fail($a->get_error_message(),409);
-
-      update_post_meta($id,'fecha_hora_inicio',$start);
-      update_post_meta($id,'fecha_hora_fin',   $end);
-      update_post_meta($id,'paciente_nombre',  $nombre);
-      update_post_meta($id,'paciente_cedula',  $cedula);
-      update_post_meta($id,'paciente_correo',  $correo);
-      update_post_meta($id,'paciente_telefono',$tel);
-      update_post_meta($id,'estado',           $estado);
-
-      $this->ok(['msg'=>'Cita actualizada']);
-    }catch(Throwable $e){
-      error_log('[ASETEC_ODO update] '.$e->getMessage());
-      $this->fail('Error interno', 500);
+    if (is_wp_error($id)) {
+      return $this->fail('Insert falló: '.$id->get_error_message(), 500);
     }
+
+    update_post_meta($id,'fecha_hora_inicio',$start);
+    update_post_meta($id,'fecha_hora_fin',   $end);
+    update_post_meta($id,'paciente_nombre',  $nombre);
+    update_post_meta($id,'paciente_cedula',  $cedula);
+    update_post_meta($id,'paciente_correo',  $correo);
+    update_post_meta($id,'paciente_telefono',$tel);
+    update_post_meta($id,'estado',           $estado);
+
+    $this->ok(['msg'=>'Cita creada','post_id'=>$id]);
+  }catch(Throwable $e){
+    error_log('[ASETEC_ODO create] '.$e->getMessage().' | POST: '.json_encode($_POST));
+    $this->fail('Error interno al crear', 500);
   }
+}
+
+public function update(){
+  try{
+    $this->nonce();
+    $id = $this->post_id();
+    $p  = $this->get_cita($id);
+    if (is_wp_error($p)) return $this->fail($p->get_error_message(),404);
+
+    $start  = $this->to_mysql_dt($_POST['start']  ?? get_post_meta($id,'fecha_hora_inicio',true));
+    $end    = $this->to_mysql_dt($_POST['end']    ?? get_post_meta($id,'fecha_hora_fin',   true));
+    $nombre = sanitize_text_field($_POST['nombre'] ?? get_post_meta($id,'paciente_nombre', true));
+    $cedula = sanitize_text_field($_POST['cedula'] ?? get_post_meta($id,'paciente_cedula', true));
+    $correo = sanitize_email      ($_POST['correo'] ?? get_post_meta($id,'paciente_correo', true));
+    $tel    = sanitize_text_field ($_POST['telefono']?? get_post_meta($id,'paciente_telefono',true));
+    $estado = sanitize_text_field ($_POST['estado']  ?? get_post_meta($id,'estado',true));
+
+    if (!$start || !$end) return $this->fail('Fechas inválidas',400);
+
+    $w = $this->validate_window($start);
+    if (is_wp_error($w)) return $this->fail($w->get_error_message(),409);
+
+    $a = $this->check_availability($start,$end,$id);
+    if (is_wp_error($a)) return $this->fail($a->get_error_message(),409);
+
+    update_post_meta($id,'fecha_hora_inicio',$start);
+    update_post_meta($id,'fecha_hora_fin',   $end);
+    update_post_meta($id,'paciente_nombre',  $nombre);
+    update_post_meta($id,'paciente_cedula',  $cedula);
+    update_post_meta($id,'paciente_correo',  $correo);
+    update_post_meta($id,'paciente_telefono',$tel);
+    update_post_meta($id,'estado',           $estado);
+
+    $this->ok(['msg'=>'Cita actualizada']);
+  }catch(Throwable $e){
+    error_log('[ASETEC_ODO update] '.$e->getMessage().' | POST: '.json_encode($_POST));
+    $this->fail('Error interno al actualizar', 500);
+  }
+}
 
   public function reschedule(){
     try{

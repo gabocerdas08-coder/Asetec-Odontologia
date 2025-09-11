@@ -1,0 +1,38 @@
+.odo-dash{ font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", Arial; }
+.odo-dash.loading{ opacity:.6; pointer-events:none; }
+
+.odo-dash__filters{
+  display:grid; grid-template-columns:1fr 1fr auto; gap:16px; align-items:end; margin-bottom:18px;
+}
+.odo-dash__range label, .odo-dash__states label{ display:block; font-size:12px; color:#666; margin-bottom:6px; }
+.odo-dash__range .quick button{ padding:6px 10px; border:1px solid #ddd; background:#fff; border-radius:8px; margin-right:6px; cursor:pointer; }
+.odo-dash__range .quick button.active{ background:#0ea5e9; color:#fff; border-color:#0ea5e9; }
+.odo-dash__range .custom{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+.odo-dash__range .custom input{ padding:6px 8px; border:1px solid #ddd; border-radius:8px; }
+.odo-dash__range .custom button{ padding:6px 10px; border:none; background:#0ea5e9; color:#fff; border-radius:8px; cursor:pointer; }
+
+.odo-dash__states .chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.odo-dash__states .chips label{ border:1px solid #ddd; padding:6px 10px; border-radius:999px; background:#fff; font-size:13px; }
+.odo-dash__states .chips input{ margin-right:6px; transform:translateY(1px); }
+
+.odo-dash__actions button{ padding:8px 12px; border:none; border-radius:8px; background:#10b981; color:#fff; cursor:pointer; }
+
+.odo-dash__kpis{ display:grid; grid-template-columns: repeat(6, 1fr); gap:14px; margin-bottom:18px; }
+.kpi{ background:#fff; border:1px solid #eee; border-radius:12px; padding:14px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+.kpi__label{ font-size:12px; color:#666; margin-bottom:6px; }
+.kpi__value{ font-size:22px; font-weight:700; }
+
+.odo-dash__grid{ display:grid; grid-template-columns: 2fr 1fr 1fr; gap:16px; margin-bottom:18px; }
+.panel{ background:#fff; border:1px solid #eee; border-radius:12px; padding:14px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+.panel__title{ font-weight:600; margin-bottom:8px; }
+
+.odo-dash__summary .grid{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.odo-dash__summary h4{ margin:8px 0; }
+.odo-dash__summary ul{ list-style:none; padding:0; margin:0; }
+.odo-dash__summary li{ padding:6px 0; border-bottom:1px dashed #eee; }
+
+@media (max-width: 1024px){
+  .odo-dash__grid{ grid-template-columns:1fr; }
+  .odo-dash__kpis{ grid-template-columns: repeat(3, 1fr); }
+  .odo-dash__filters{ grid-template-columns:1fr; }
+}

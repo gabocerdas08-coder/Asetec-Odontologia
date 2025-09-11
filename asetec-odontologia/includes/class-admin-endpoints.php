@@ -200,6 +200,11 @@ public function create(){
     update_post_meta($id,'paciente_telefono',$tel);
     update_post_meta($id,'estado',           $estado);
 
+    // Enviar correo de solicitud recibida
+    if (class_exists('ASETEC_ODO_Emails')) {
+      ASETEC_ODO_Emails::send_request_received($id);
+    }
+
     $this->ok(['msg'=>'Cita creada','post_id'=>$id]);
   }catch(Throwable $e){
     error_log('[ASETEC_ODO create] '.$e->getMessage().' | POST: '.json_encode($_POST));
@@ -238,6 +243,11 @@ public function update(){
     update_post_meta($id,'paciente_telefono',$tel);
     update_post_meta($id,'estado',           $estado);
 
+    // Enviar correo de datos actualizados
+    if (class_exists('ASETEC_ODO_Emails')) {
+      ASETEC_ODO_Emails::send_updated($id);
+    }
+
     $this->ok(['msg'=>'Cita actualizada']);
   }catch(Throwable $e){
     error_log('[ASETEC_ODO update] '.$e->getMessage().' | POST: '.json_encode($_POST));
@@ -245,7 +255,7 @@ public function update(){
   }
 }
 
-  public function reschedule(){
+public function reschedule(){
     try{
       $this->nonce();
       $id = $this->post_id();
@@ -265,6 +275,12 @@ public function update(){
       update_post_meta($id,'fecha_hora_inicio',$start);
       update_post_meta($id,'fecha_hora_fin',   $end);
       update_post_meta($id,'estado','reprogramada');
+
+      // Enviar correo de cita reprogramada
+      if (class_exists('ASETEC_ODO_Emails')) {
+        ASETEC_ODO_Emails::send_rescheduled($id);
+      }
+
       $this->ok(['msg'=>'Cita reprogramada']);
     }catch(Throwable $e){
       error_log('[ASETEC_ODO reschedule] '.$e->getMessage());
@@ -280,6 +296,12 @@ public function update(){
       if (is_wp_error($p)) return $this->fail($p->get_error_message(),404);
 
       update_post_meta($id,'estado','aprobada');
+
+      // Enviar correo de cita aprobada
+      if (class_exists('ASETEC_ODO_Emails')) {
+        ASETEC_ODO_Emails::send_approved($id);
+      }
+
       $this->ok(['msg'=>'Cita aprobada']);
     }catch(Throwable $e){
       error_log('[ASETEC_ODO approve] '.$e->getMessage());
@@ -295,6 +317,12 @@ public function update(){
       if (is_wp_error($p)) return $this->fail($p->get_error_message(),404);
 
       update_post_meta($id,'estado','cancelada_admin');
+
+      // Enviar correo de cita cancelada
+      if (class_exists('ASETEC_ODO_Emails')) {
+        ASETEC_ODO_Emails::send_cancelled($id);
+      }
+
       $this->ok(['msg'=>'Cita cancelada']);
     }catch(Throwable $e){
       error_log('[ASETEC_ODO cancel] '.$e->getMessage());
@@ -310,6 +338,12 @@ public function update(){
       if (is_wp_error($p)) return $this->fail($p->get_error_message(),404);
 
       update_post_meta($id,'estado','realizada');
+
+      // Puedes agregar un correo si lo necesitas, por ejemplo:
+      // if (class_exists('ASETEC_ODO_Emails')) {
+      //   ASETEC_ODO_Emails::send_done($id);
+      // }
+
       $this->ok(['msg'=>'Marcada como realizada']);
     }catch(Throwable $e){
       error_log('[ASETEC_ODO mark_done] '.$e->getMessage());

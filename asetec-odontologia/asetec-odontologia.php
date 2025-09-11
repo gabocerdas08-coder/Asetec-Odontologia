@@ -9,7 +9,7 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 final class ASETEC_Odontologia {
-    const VERSION = '0.3.12';
+    const VERSION = '0.3.13';
     private static $instance = null;
 
     /** Feature flags (puedes activar más adelante) */

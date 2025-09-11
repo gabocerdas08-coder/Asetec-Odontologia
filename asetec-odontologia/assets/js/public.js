@@ -40,3 +40,14 @@
     });
   });
 })(jQuery);
+
+document.addEventListener('DOMContentLoaded', function(){
+  const chkFam = document.getElementById('chk_fam');
+  const famFields = document.getElementById('fam_fields');
+  if (chkFam && famFields) {
+    chkFam.addEventListener('change', function(){
+      famFields.style.display = chkFam.checked ? 'block' : 'none';
+    });
+  }
+  // Puedes agregar más mejoras visuales aquí (validaciones, feedback, etc)
+});

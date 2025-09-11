@@ -32,30 +32,81 @@ class ASETEC_ODO_Shortcode_Reservar {
         wp_enqueue_script( 'asetec-odo-public' );
         ob_start(); ?>
         <div class="asetec-odo-reservar">
-            <div class="selector-fecha">
-                <label><?php esc_html_e('Fecha', 'asetec-odontologia'); ?> <input type="date" id="odo_fecha" min="<?php echo esc_attr( date('Y-m-d') ); ?>"></label>
-                <button class="button" id="odo_buscar"><?php esc_html_e('Buscar disponibilidad', 'asetec-odontologia'); ?></button>
+          <div class="selector-fecha">
+            <label>
+              <?php esc_html_e('Fecha', 'asetec-odontologia'); ?>
+              <input type="date" id="odo_fecha" min="<?php echo esc_attr( date('Y-m-d') ); ?>">
+            </label>
+            <button class="button" id="odo_buscar"><?php esc_html_e('Buscar disponibilidad', 'asetec-odontologia'); ?></button>
+          </div>
+          <div id="odo_slots"></div>
+          <form id="odo_form" style="display:none;" method="post">
+            <h3><?php esc_html_e('Datos de contacto', 'asetec-odontologia'); ?></h3>
+            <input type="hidden" name="start" id="odo_start" />
+            <input type="hidden" name="end" id="odo_end" />
+            <p>
+              <label><?php esc_html_e('Nombre completo', 'asetec-odontologia'); ?>
+                <input type="text" name="nombre" required>
+              </label>
+            </p>
+            <p>
+              <label><?php esc_html_e('Cédula', 'asetec-odontologia'); ?>
+                <input type="text" name="cedula" required>
+              </label>
+            </p>
+            <p>
+              <label><?php esc_html_e('Correo', 'asetec-odontologia'); ?>
+                <input type="email" name="correo" required>
+              </label>
+            </p>
+            <p>
+              <label><?php esc_html_e('Teléfono', 'asetec-odontologia'); ?>
+                <input type="tel" name="telefono" required>
+              </label>
+            </p>
+            <p>
+              <label>
+                <input type="checkbox" name="es_asociado" value="1">
+                <?php esc_html_e('Soy asociado', 'asetec-odontologia'); ?>
+              </label>
+            </p>
+            <p>
+              <label>
+                <input type="checkbox" name="es_familiar" id="chk_fam" value="1">
+                <?php esc_html_e('Es un familiar directo', 'asetec-odontologia'); ?>
+              </label>
+            </p>
+            <div id="fam_fields" style="display:none;">
+              <p>
+                <label><?php esc_html_e('Nombre del familiar', 'asetec-odontologia'); ?>
+                  <input type="text" name="familiar_nombre">
+                </label>
+              </p>
+              <p>
+                <label><?php esc_html_e('Cédula del familiar', 'asetec-odontologia'); ?>
+                  <input type="text" name="familiar_cedula">
+                </label>
+              </p>
+              <p>
+                <label><?php esc_html_e('Parentesco', 'asetec-odontologia'); ?>
+                  <input type="text" name="parentesco">
+                </label>
+              </p>
+              <p>
+                <label><?php esc_html_e('Correo del familiar', 'asetec-odontologia'); ?>
+                  <input type="email" name="familiar_correo">
+                </label>
+              </p>
+              <p>
+                <label><?php esc_html_e('Teléfono del familiar', 'asetec-odontologia'); ?>
+                  <input type="tel" name="familiar_telefono">
+                </label>
+              </p>
             </div>
-            <div id="odo_slots"></div>
-            <form id="odo_form" style="display:none;" method="post">
-                <h3><?php esc_html_e('Datos de contacto', 'asetec-odontologia'); ?></h3>
-                <input type="hidden" name="start" id="odo_start" />
-                <input type="hidden" name="end" id="odo_end" />
-                <p><label><?php esc_html_e('Nombre completo', 'asetec-odontologia'); ?> <input type="text" name="nombre" required></label></p>
-                <p><label><?php esc_html_e('Cédula', 'asetec-odontologia'); ?> <input type="text" name="cedula" required></label></p>
-                <p><label><?php esc_html_e('Correo', 'asetec-odontologia'); ?> <input type="email" name="correo" required></label></p>
-                <p><label><?php esc_html_e('Teléfono', 'asetec-odontologia'); ?> <input type="tel" name="telefono" required></label></p>
-                <p><label><input type="checkbox" name="es_asociado" value="1"> <?php esc_html_e('Soy asociado', 'asetec-odontologia'); ?></label></p>
-                <p><label><input type="checkbox" name="es_familiar" id="chk_fam" value="1"> <?php esc_html_e('Es un familiar directo', 'asetec-odontologia'); ?></label></p>
-                <div id="fam_fields" style="display:none;">
-                    <p><label><?php esc_html_e('Nombre del familiar', 'asetec-odontologia'); ?> <input type="text" name="familiar_nombre"></label></p>
-                    <p><label><?php esc_html_e('Cédula del familiar', 'asetec-odontologia'); ?> <input type="text" name="familiar_cedula"></label></p>
-                    <p><label><?php esc_html_e('Parentesco', 'asetec-odontologia'); ?> <input type="text" name="parentesco"></label></p>
-                    <p><label><?php esc_html_e('Correo del familiar', 'asetec-odontologia'); ?> <input type="email" name="familiar_correo"></label></p>
-                    <p><label><?php esc_html_e('Teléfono del familiar', 'asetec-odontologia'); ?> <input type="tel" name="familiar_telefono"></label></p>
-                </div>
-                <p><button class="button button-primary" id="odo_submit"><?php esc_html_e('Solicitar cita', 'asetec-odontologia'); ?></button></p>
-            </form>
+            <p>
+              <button class="button button-primary" id="odo_submit"><?php esc_html_e('Solicitar cita', 'asetec-odontologia'); ?></button>
+            </p>
+          </form>
         </div>
         <?php return ob_get_clean();
     }

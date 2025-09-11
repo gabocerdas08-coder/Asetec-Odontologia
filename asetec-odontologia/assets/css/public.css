@@ -1,5 +1,118 @@
-.asetec-odo-reservar{max-width:720px;margin:0 auto}
-.asetec-odo-reservar .selector-fecha{display:flex;gap:12px;align-items:end;margin:12px 0}
-.odo-slot-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin:16px 0;padding:0;list-style:none}
-.odo-slot-list .button{width:100%}
-#fam_fields{padding:10px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc}
+/* Contenedor principal */
+.asetec-odo-reservar {
+  max-width: 480px;
+  margin: 40px auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  padding: 32px 24px;
+  font-family: 'Segoe UI', Arial, sans-serif;
+}
+
+/* Selector de fecha y botón */
+.selector-fecha {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+.selector-fecha label {
+  font-weight: 500;
+}
+.selector-fecha input[type="date"] {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 16px;
+}
+.selector-fecha .button {
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+.selector-fecha .button:hover {
+  background: #2563eb;
+}
+
+/* Horarios disponibles */
+#odo_slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+#odo_slots button {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 8px 18px;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.2s, border 0.2s;
+}
+#odo_slots button.selected,
+#odo_slots button:hover {
+  background: #3b82f6;
+  color: #fff;
+  border-color: #2563eb;
+}
+
+/* Formulario de datos */
+#odo_form {
+  margin-top: 10px;
+}
+#odo_form h3 {
+  font-size: 1.15em;
+  margin-bottom: 12px;
+  color: #2563eb;
+}
+#odo_form p {
+  margin-bottom: 14px;
+}
+#odo_form label {
+  font-weight: 500;
+  display: block;
+  margin-bottom: 4px;
+}
+#odo_form input[type="text"],
+#odo_form input[type="email"],
+#odo_form input[type="tel"] {
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  font-size: 15px;
+  margin-top: 2px;
+}
+#odo_form input[type="checkbox"] {
+  margin-right: 6px;
+}
+#odo_form .button-primary {
+  background: #10b981;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 22px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#odo_form .button-primary:hover {
+  background: #059669;
+}
+
+/* Campos de familiar */
+#fam_fields {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  border: 1px solid #e5e7eb;
+}

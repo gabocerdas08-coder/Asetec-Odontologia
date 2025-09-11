@@ -16,7 +16,7 @@ final class ASETEC_Odontologia {
     const ENABLE_PUBLIC  = true;   // shortcode público [odo_reservar]
     const ENABLE_AGENDA  = true;   // shortcode admin [odo_admin_agenda]
     const ENABLE_CRON    = true;   // recordatorios
-    const ENABLE_DASH    = false;  // 🚫 dashboard/reportes desactivado por defecto
+    const ENABLE_DASH    = true;  // 🚫 dashboard/reportes desactivado por defecto
 
     public static function instance(){ return self::$instance ?? ( self::$instance = new self() ); }
 
@@ -93,7 +93,6 @@ final class ASETEC_Odontologia {
 
         // Dashboard / reportes (opcional)
         if ( self::ENABLE_DASH ) {
-            $this->safe_include('includes/class-dashboard.php');
             $this->safe_include('includes/class-shortcode-dashboard.php');
         }
     }

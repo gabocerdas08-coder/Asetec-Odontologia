@@ -16,7 +16,7 @@ final class ASETEC_Odontologia {
     const ENABLE_PUBLIC  = true;
     const ENABLE_AGENDA  = true;
     const ENABLE_CRON    = true;
-    const ENABLE_DASH    = true;
+    const ENABLE_DASH    = false;
 
     /** Elige UNA variante de agenda: 'classic' | 'tui' | 'hybrid' */
     const ADMIN_AGENDA_VARIANT = 'hybrid';

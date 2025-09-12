@@ -1,28 +1,16 @@
-.asetec-odo-dash.wrap { max-width: 1200px; }
-.asetec-odo-dash .dash-title { font-size: 28px; margin: 10px 0 18px; }
+.odo-dash { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+.odo-dash__toolbar { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end; margin-bottom:18px; }
+.odo-field { display:flex; flex-direction:column; gap:6px; min-width:170px; }
+.odo-field.grow { flex:1; min-width:260px; }
+.odo-field input[type="date"],
+.odo-field input[type="text"] { padding:8px 10px; border:1px solid #d7d7d7; border-radius:6px; }
+.odo-field.buttons { gap:8px; }
+.odo-states { display:grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap:6px 16px; padding:8px 10px; border:1px dashed #ddd; border-radius:8px; }
 
-.dash-filters { display: grid; grid-template-columns: repeat(12,1fr); gap: 12px; align-items: end; margin-bottom: 16px; }
-.dash-filters .df-item { display:flex; flex-direction:column; gap:6px; }
-.dash-filters .df-item label{ font-size:12px;color:#555;margin-bottom:2px; }
-.dash-filters .df-item input[type="text"]{ width:100%; }
-.dash-filters .df-item.grow{ grid-column: span 6; }
-.dash-filters .df-item.v-end button{ margin-right:8px; }
-.dash-filters .df-states{ display:flex; gap:8px; flex-wrap:wrap; }
-.dash-filters .df-states label{ font-size:12px; background:#f6f7f7; border:1px solid #e6e6e6; padding:4px 8px; border-radius:6px; }
-
-.dash-kpis { display: grid; grid-template-columns: repeat(4, minmax(180px,1fr)); gap: 14px; }
-@media (max-width: 960px){ .dash-kpis { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 560px){ .dash-kpis { grid-template-columns: 1fr; } }
-
-.kpi { background:#fff; border:1px solid #e6e6e6; border-radius:10px; padding:14px 16px; box-shadow: 0 2px 4px rgba(0,0,0,.04); }
-.kpi .kpi-label { font-size: 13px; color:#666; margin-bottom: 6px; }
-.kpi .kpi-value { font-size: 28px; font-weight: 700; color:#222; }
-
-.dash-charts{ display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-top:16px; }
-@media (max-width: 960px){ .dash-charts{ grid-template-columns: 1fr; } }
-.chart-card{ background:#fff; border:1px solid #e6e6e6; border-radius:10px; padding:12px; height:360px; display:flex; flex-direction:column; }
-.chart-card h3{ margin: 4px 6px 10px; font-size:14px; color:#444; }
-.chart-card canvas{ flex:1; min-height: 0; }
-
-.dash-log { margin-top: 12px; font-size: 13px; color:#666; }
-.dash-log.is-error { color:#a00; }
+.odo-kpis { display:grid; grid-template-columns: repeat(7, minmax(140px,1fr)); gap:12px; margin:18px 0 8px; }
+.kpi { background:#fff; border:1px solid #eee; border-radius:12px; padding:12px 14px; box-shadow:0 1px 2px rgba(0,0,0,.03); }
+.kpi-h { color:#666; font-size:12px; margin-bottom:6px; }
+.kpi-v { font-size:26px; font-weight:700; }
+@media (max-width: 1100px){
+  .odo-kpis { grid-template-columns: repeat(3, minmax(140px,1fr)); }
+}

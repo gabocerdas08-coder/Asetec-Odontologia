@@ -2,324 +2,280 @@
 if ( ! defined('ABSPATH') ) exit;
 
 if ( ! class_exists('ASETEC_ODO_Shortcode_Dashboard') ) {
+
 class ASETEC_ODO_Shortcode_Dashboard {
 
     const SLUG = 'asetec-odo-dashboard';
 
     public function __construct(){
         add_shortcode('odo_dashboard', [ $this, 'render' ]);
+        add_action('wp_enqueue_scripts', [ $this, 'enqueue_assets' ]);
 
-        // AJAX
-        add_action( 'wp_ajax_asetec_odo_dash_kpis',   [ $this, 'ajax_kpis' ] );
-        add_action( 'wp_ajax_asetec_odo_dash_series', [ $this, 'ajax_series' ] );
-        add_action( 'wp_ajax_asetec_odo_dash_export', [ $this, 'ajax_export' ] );
+        // AJAX data (json) y CSV
+        add_action('wp_ajax_asetec_odo_dash_data', [ $this, 'ajax_data' ]);
+        add_action('wp_ajax_asetec_odo_dash_csv',  [ $this, 'ajax_csv' ]);
     }
 
-private function enqueue_assets(){
-    // CSS del dashboard
-    wp_register_style(
-        self::SLUG,
-        ASETEC_ODO_URL . 'assets/css/dashboard.css',
-        [],
-        ASETEC_Odontologia::VERSION
-    );
-
-    // Chart.js desde CDN (no requiere archivo local)
-    wp_register_script(
-        'chartjs',
-        'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
-        [],
-        '4.4.3',
-        true
-    );
-
-    // JS del dashboard (depende de chartjs)
-    wp_register_script(
-        self::SLUG,
-        ASETEC_ODO_URL . 'assets/js/dashboard.js',
-        [ 'jquery', 'chartjs' ],
-        ASETEC_Odontologia::VERSION,
-        true
-    );
-
-    wp_localize_script( self::SLUG, 'ASETEC_ODO_DASH', [
-        'ajax'  => admin_url('admin-ajax.php'),
-        'nonce' => wp_create_nonce('asetec_odo_dash'),
-        'i18n'  => [
-            'loading'   => __('Cargando…', 'asetec-odontologia'),
-            'error'     => __('Ocurrió un error al cargar.', 'asetec-odontologia'),
-            'na'        => __('N/D', 'asetec-odontologia'),
-            'download'  => __('Descargar CSV', 'asetec-odontologia'),
-        ],
-        'states' => [
-            'pendiente','aprobada','realizada','cancelada_usuario','cancelada_admin','reprogramada'
-        ],
-    ]);
-
-    wp_enqueue_style( self::SLUG );
-    wp_enqueue_script( self::SLUG );
-}
-
+    private function can_view(){
+        // ajusta si quieres otro capability/rol
+        return current_user_can('manage_options');
+    }
 
     public function render(){
-        if ( ! current_user_can('manage_options') ) {
-            return '<div class="asetec-odo-dash wrap"><p>No autorizado.</p></div>';
+        if ( ! $this->can_view() ) {
+            return '<div class="notice notice-error"><p>No autorizado.</p></div>';
         }
 
-        $this->enqueue_assets();
-
         ob_start(); ?>
-        <div class="asetec-odo-dash wrap">
-            <h2 class="dash-title"><?php esc_html_e('Dashboard Odontología', 'asetec-odontologia'); ?></h2>
-
-            <!-- Filtros -->
-            <div class="dash-filters">
-                <div class="df-item">
-                    <label><?php esc_html_e('Desde', 'asetec-odontologia'); ?></label>
-                    <input type="date" id="odo_from" />
+        <div class="odo-dash">
+            <div class="odo-dash__toolbar">
+                <div class="odo-field">
+                    <label>Desde</label>
+                    <input type="date" id="odo-from" />
                 </div>
-                <div class="df-item">
-                    <label><?php esc_html_e('Hasta', 'asetec-odontologia'); ?></label>
-                    <input type="date" id="odo_to" />
+                <div class="odo-field">
+                    <label>Hasta</label>
+                    <input type="date" id="odo-to" />
                 </div>
-                <div class="df-item grow">
-                    <label><?php esc_html_e('Buscar (nombre o cédula)', 'asetec-odontologia'); ?></label>
-                    <input type="text" id="odo_q" placeholder="<?php esc_attr_e('Ej.: 1-2345-6789 o María', 'asetec-odontologia'); ?>" />
+                <div class="odo-field grow">
+                    <label>Buscar (nombre o cédula)</label>
+                    <input type="text" id="odo-q" placeholder="Ej.: 1-2345-6789 o María" />
                 </div>
-                <div class="df-item">
-                    <label><?php esc_html_e('Estados', 'asetec-odontologia'); ?></label>
-                    <div class="df-states" id="odo_states">
-                        <label><input type="checkbox" value="pendiente" checked> <?php esc_html_e('Pendiente','asetec-odontologia'); ?></label>
-                        <label><input type="checkbox" value="aprobada" checked> <?php esc_html_e('Aprobada','asetec-odontologia'); ?></label>
-                        <label><input type="checkbox" value="realizada" checked> <?php esc_html_e('Realizada','asetec-odontologia'); ?></label>
-                        <label><input type="checkbox" value="cancelada_usuario" checked> <?php esc_html_e('Cancelada usuario','asetec-odontologia'); ?></label>
-                        <label><input type="checkbox" value="cancelada_admin" checked> <?php esc_html_e('Cancelada admin','asetec-odontologia'); ?></label>
-                        <label><input type="checkbox" value="reprogramada" checked> <?php esc_html_e('Reprogramada','asetec-odontologia'); ?></label>
+                <div class="odo-field">
+                    <label>Estados</label>
+                    <div class="odo-states">
+                        <label><input type="checkbox" class="st" value="pendiente" checked> Pendiente</label>
+                        <label><input type="checkbox" class="st" value="aprobada" checked> Aprobada</label>
+                        <label><input type="checkbox" class="st" value="realizada" checked> Realizada</label>
+                        <label><input type="checkbox" class="st" value="cancelada_usuario" checked> Cancelada usuario</label>
+                        <label><input type="checkbox" class="st" value="cancelada_admin" checked> Cancelada admin</label>
+                        <label><input type="checkbox" class="st" value="reprogramada" checked> Reprogramada</label>
                     </div>
                 </div>
-                <div class="df-item v-end">
-                    <button id="odo_refresh" class="button button-primary">
-                        <?php esc_html_e('Actualizar', 'asetec-odontologia'); ?>
-                    </button>
-                    <button id="odo_export" class="button">
-                        <?php esc_html_e('Exportar CSV', 'asetec-odontologia'); ?>
-                    </button>
+                <div class="odo-field buttons">
+                    <button id="odo-refresh" class="button button-primary">Actualizar</button>
+                    <button id="odo-export" class="button">Exportar CSV</button>
                 </div>
             </div>
 
-            <!-- KPIs -->
-            <div class="dash-kpis">
-                <div class="kpi"><div class="kpi-label"><?php esc_html_e('Total', 'asetec-odontologia'); ?></div><div class="kpi-value" id="kpi_total">—</div></div>
-                <div class="kpi"><div class="kpi-label"><?php esc_html_e('Pendientes', 'asetec-odontologia'); ?></div><div class="kpi-value" id="kpi_pendiente">—</div></div>
-                <div class="kpi"><div class="kpi-label"><?php esc_html_e('Aprobadas', 'asetec-odontologia'); ?></div><div class="kpi-value" id="kpi_aprobada">—</div></div>
-                <div class="kpi"><div class="kpi-label"><?php esc_html_e('Realizadas', 'asetec-odontologia'); ?></div><div class="kpi-value" id="kpi_realizada">—</div></div>
-                <div class="kpi"><div class="kpi-label"><?php esc_html_e('Canceladas (usuario)', 'asetec-odontologia'); ?></div><div class="kpi-value" id="kpi_cancelada_usuario">—</div></div>
-                <div class="kpi"><div class="kpi-label"><?php esc_html_e('Canceladas (admin)', 'asetec-odontologia'); ?></div><div class="kpi-value" id="kpi_cancelada_admin">—</div></div>
-                <div class="kpi"><div class="kpi-label"><?php esc_html_e('Reprogramadas', 'asetec-odontologia'); ?></div><div class="kpi-value" id="kpi_reprogramada">—</div></div>
+            <div class="odo-kpis">
+                <div class="kpi"><div class="kpi-h">Total</div><div class="kpi-v" id="k-total">0</div></div>
+                <div class="kpi"><div class="kpi-h">Pendientes</div><div class="kpi-v" id="k-pend">0</div></div>
+                <div class="kpi"><div class="kpi-h">Aprobadas</div><div class="kpi-v" id="k-aprob">0</div></div>
+                <div class="kpi"><div class="kpi-h">Realizadas</div><div class="kpi-v" id="k-real">0</div></div>
+                <div class="kpi"><div class="kpi-h">Canceladas (usuario)</div><div class="kpi-v" id="k-canu">0</div></div>
+                <div class="kpi"><div class="kpi-h">Canceladas (admin)</div><div class="kpi-v" id="k-cana">0</div></div>
+                <div class="kpi"><div class="kpi-h">Reprogramadas</div><div class="kpi-v" id="k-reprog">0</div></div>
             </div>
 
-            <!-- Gráficas -->
-            <div class="dash-charts">
-                <div class="chart-card">
-                    <h3><?php esc_html_e('Citas por día (todas las seleccionadas)', 'asetec-odontologia'); ?></h3>
-                    <canvas id="chart_total"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3><?php esc_html_e('Distribución por estado (acumulado)', 'asetec-odontologia'); ?></h3>
-                    <canvas id="chart_states"></canvas>
-                </div>
-            </div>
+            <h3>Citas por día (todas las seleccionadas)</h3>
+            <canvas id="odo-chart-line" height="80"></canvas>
 
-            <div class="dash-log" id="dash_log" aria-live="polite"></div>
+            <h3>Distribución por estado (acumulado)</h3>
+            <canvas id="odo-chart-donut" height="80"></canvas>
         </div>
         <?php
         return ob_get_clean();
     }
 
-    /** -------- Helpers comunes -------- */
+    public function enqueue_assets(){
+        if ( ! is_singular() && ! is_page() ) return; // depende de dónde uses el shortcode
 
-    private function parse_filters(){
-        $from = isset($_POST['from']) ? sanitize_text_field($_POST['from']) : '';
-        $to   = isset($_POST['to'])   ? sanitize_text_field($_POST['to'])   : '';
-        $q    = isset($_POST['q'])    ? sanitize_text_field($_POST['q'])    : '';
-        $states = [];
-        if ( ! empty($_POST['states']) && is_array($_POST['states']) ) {
-            $states = array_map('sanitize_text_field', $_POST['states']);
-        }
+        // CSS
+        wp_register_style(
+            self::SLUG,
+            ASETEC_ODO_URL . 'assets/css/dashboard.css',
+            [],
+            ASETEC_Odontologia::VERSION
+        );
 
-        $from_ts = $from && preg_match('/^\d{4}-\d{2}-\d{2}$/',$from) ? strtotime($from.' 00:00:00') : 0;
-        $to_ts   = $to   && preg_match('/^\d{4}-\d{2}-\d{2}$/',$to)   ? strtotime($to.' 23:59:59') : 0;
+        // Chart.js por CDN (evita el problema del MIME)
+        wp_register_script(
+            'chartjs',
+            'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
+            [],
+            '4.4.3',
+            true
+        );
 
-        $meta_query = [];
-        if ( $from_ts || $to_ts ) {
-            $val_from = $from_ts ? date('Y-m-d H:i:s', $from_ts) : '0000-01-01 00:00:00';
-            $val_to   = $to_ts   ? date('Y-m-d H:i:s', $to_ts)   : '9999-12-31 23:59:59';
-            $meta_query[] = [
+        // JS
+        wp_register_script(
+            self::SLUG,
+            ASETEC_ODO_URL . 'assets/js/dashboard.js',
+            ['jquery','chartjs'],
+            ASETEC_Odontologia::VERSION,
+            true
+        );
+
+        wp_localize_script(self::SLUG, 'ASETEC_ODO_DASH', [
+            'ajax'  => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('asetec_odo_dash'),
+            'i18n'  => [
+                'loading'  => __('Cargando…','asetec-odontologia'),
+                'error'    => __('Ocurrió un error','asetec-odontologia'),
+            ],
+        ]);
+
+        wp_enqueue_style(self::SLUG);
+        wp_enqueue_script(self::SLUG);
+    }
+
+    /** ------------  DATA (JSON) ---------------- */
+    public function ajax_data(){
+        if ( ! $this->can_view() ) wp_send_json_error(['msg'=>'No autorizado'], 403);
+        check_ajax_referer('asetec_odo_dash','nonce');
+
+        $from = sanitize_text_field($_POST['from'] ?? '');
+        $to   = sanitize_text_field($_POST['to'] ?? '');
+        $q    = sanitize_text_field($_POST['q'] ?? '');
+        $st   = isset($_POST['states']) && is_array($_POST['states']) ? array_map('sanitize_text_field', $_POST['states']) : [];
+
+        $args = [
+            'post_type'      => 'cita_odontologia',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'fields'         => 'ids',
+            'meta_query'     => [],
+            'date_query'     => [],
+        ];
+
+        // Rango por meta fecha_hora_inicio (YYYY-mm-dd HH:ii:ss)
+        if ( $from ) {
+            $args['meta_query'][] = [
                 'key'     => 'fecha_hora_inicio',
-                'value'   => [ $val_from, $val_to ],
+                'value'   => $from . ' 00:00:00',
+                'compare' => '>=',
                 'type'    => 'DATETIME',
-                'compare' => 'BETWEEN',
+            ];
+        }
+        if ( $to ) {
+            $args['meta_query'][] = [
+                'key'     => 'fecha_hora_inicio',
+                'value'   => $to . ' 23:59:59',
+                'compare' => '<=',
+                'type'    => 'DATETIME',
             ];
         }
 
-        // search por nombre/cédula correo/teléfono
-        $s_meta = [];
+        // Estados
+        if ( $st ) {
+            $args['meta_query'][] = [
+                'key'     => 'estado',
+                'value'   => $st,
+                'compare' => 'IN',
+            ];
+        }
+
+        // Búsqueda por nombre o cédula (dos meta_query con OR)
         if ( $q ) {
-            $s_meta = [
+            $args['meta_query'][] = [
                 'relation' => 'OR',
                 [
                     'key'     => 'paciente_nombre',
                     'value'   => $q,
-                    'compare' => 'LIKE',
+                    'compare' => 'LIKE'
                 ],
                 [
                     'key'     => 'paciente_cedula',
                     'value'   => $q,
-                    'compare' => 'LIKE',
-                ],
-                [
-                    'key'     => 'paciente_correo',
-                    'value'   => $q,
-                    'compare' => 'LIKE',
-                ],
-                [
-                    'key'     => 'paciente_telefono',
-                    'value'   => $q,
-                    'compare' => 'LIKE',
-                ],
+                    'compare' => 'LIKE'
+                ]
             ];
         }
-        if ( $s_meta ) {
-            $meta_query[] = $s_meta;
-        }
 
-        return [ $meta_query, $states ];
-    }
+        $qposts = new WP_Query($args);
+        $ids = $qposts->posts;
 
-    /** -------- AJAX: KPIs -------- */
-    public function ajax_kpis(){
-        if ( ! current_user_can('manage_options') ) wp_send_json_error(['msg'=>'No autorizado'],403);
-        check_ajax_referer( 'asetec_odo_dash', 'nonce' );
-
-        [ $meta_query, $states ] = $this->parse_filters();
-
-        $args = [
-            'post_type'      => 'cita_odontologia',
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'meta_query'     => $meta_query,
-        ];
-
-        $ids = get_posts($args);
-
+        // KPIs y series
         $kpis = [
-            'total' => 0,
-            'pendiente'=>0,'aprobada'=>0,'realizada'=>0,
-            'cancelada_usuario'=>0,'cancelada_admin'=>0,'reprogramada'=>0,
+            'total' => 0, 'pendiente'=>0,'aprobada'=>0,'realizada'=>0,
+            'cancelada_usuario'=>0, 'cancelada_admin'=>0, 'reprogramada'=>0,
         ];
+        $per_day = []; // Y-m-d => count
 
-        if ( $ids ) {
-            foreach ( $ids as $pid ) {
-                $estado = get_post_meta( $pid, 'estado', true );
-                if ( ! $states || in_array($estado, $states, true) ) {
-                    $kpis['total']++;
-                    if ( isset($kpis[$estado]) ) $kpis[$estado]++;
-                }
+        foreach ($ids as $pid){
+            $estado = get_post_meta($pid,'estado', true );
+            $fecha  = get_post_meta($pid,'fecha_hora_inicio', true );
+            $kpis['total']++;
+
+            if ( isset($kpis[$estado]) ) $kpis[$estado]++;
+
+            if ( $fecha ) {
+                $day = substr($fecha, 0, 10);
+                if ( ! isset($per_day[$day]) ) $per_day[$day] = 0;
+                $per_day[$day]++;
             }
         }
 
-        wp_send_json_success([ 'kpis'=>$kpis ]);
-    }
-
-    /** -------- AJAX: Series para gráficas -------- */
-    public function ajax_series(){
-        if ( ! current_user_can('manage_options') ) wp_send_json_error(['msg'=>'No autorizado'],403);
-        check_ajax_referer( 'asetec_odo_dash', 'nonce' );
-
-        [ $meta_query, $states ] = $this->parse_filters();
-
-        $args = [
-            'post_type'      => 'cita_odontologia',
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'fields'         => 'ids',
-            'meta_query'     => $meta_query,
-        ];
-        $ids = get_posts($args);
-
-        $by_date = [];    // 'Y-m-d' => total
-        $by_state = [ 'pendiente'=>0,'aprobada'=>0,'realizada'=>0,'cancelada_usuario'=>0,'cancelada_admin'=>0,'reprogramada'=>0 ];
-
-        if ( $ids ) {
-            foreach ( $ids as $pid ) {
-                $estado = get_post_meta( $pid, 'estado', true );
-                $start  = get_post_meta( $pid, 'fecha_hora_inicio', true );
-                $day    = $start ? substr($start,0,10) : 'sin_fecha';
-
-                if ( ! $states || in_array($estado, $states, true) ) {
-                    $by_date[$day] = ($by_date[$day] ?? 0) + 1;
-                    if ( isset($by_state[$estado]) ) $by_state[$estado]++;
-                }
-            }
-        }
-
-        ksort($by_date);
-        $labels = array_keys($by_date);
-        $values = array_values($by_date);
+        ksort($per_day);
+        $labels = array_keys($per_day);
+        $values = array_values($per_day);
 
         wp_send_json_success([
-            'labels' => $labels,
-            'total'  => $values,
-            'states' => $by_state,
+            'kpis'   => $kpis,
+            'line'   => ['labels'=>$labels, 'values'=>$values],
+            'donut'  => [
+                'labels' => ['Pendiente','Aprobada','Realizada','Cancelada usuario','Cancelada admin','Reprogramada'],
+                'values' => [
+                    $kpis['pendiente'],$kpis['aprobada'],$kpis['realizada'],
+                    $kpis['cancelada_usuario'],$kpis['cancelada_admin'],$kpis['reprogramada']
+                ]
+            ],
         ]);
     }
 
-    /** -------- AJAX: Export CSV -------- */
-    public function ajax_export(){
-        if ( ! current_user_can('manage_options') ) wp_send_json_error(['msg'=>'No autorizado'],403);
-        check_ajax_referer( 'asetec_odo_dash', 'nonce' );
+    /** ------------  CSV ---------------- */
+    public function ajax_csv(){
+        if ( ! $this->can_view() ) wp_die('No autorizado', '', 403);
+        check_ajax_referer('asetec_odo_dash','nonce');
 
-        [ $meta_query, $states ] = $this->parse_filters();
+        $from = sanitize_text_field($_GET['from'] ?? '');
+        $to   = sanitize_text_field($_GET['to'] ?? '');
+        $q    = sanitize_text_field($_GET['q'] ?? '');
+        $st   = isset($_GET['states']) && is_array($_GET['states']) ? array_map('sanitize_text_field', $_GET['states']) : [];
 
         $args = [
             'post_type'      => 'cita_odontologia',
             'post_status'    => 'publish',
             'posts_per_page' => -1,
-            'meta_query'     => $meta_query,
+            'fields'         => 'ids',
+            'meta_query'     => [],
         ];
+        if ( $from ) $args['meta_query'][] = ['key'=>'fecha_hora_inicio','value'=>$from.' 00:00:00','compare'=>'>=','type'=>'DATETIME'];
+        if ( $to )   $args['meta_query'][] = ['key'=>'fecha_hora_inicio','value'=>$to.' 23:59:59','compare'=>'<=','type'=>'DATETIME'];
+        if ( $st )   $args['meta_query'][] = ['key'=>'estado','value'=>$st,'compare'=>'IN'];
+        if ( $q )    $args['meta_query'][] = ['relation'=>'OR',
+                            ['key'=>'paciente_nombre','value'=>$q,'compare'=>'LIKE'],
+                            ['key'=>'paciente_cedula','value'=>$q,'compare'=>'LIKE']];
 
-        $q = new WP_Query($args);
-        $rows = [];
-        $rows[] = ['ID','Estado','Inicio','Fin','Nombre','Cédula','Correo','Teléfono'];
+        $qposts = new WP_Query($args);
+        $ids = $qposts->posts;
 
-        if ( $q->have_posts() ) {
-            foreach ( $q->posts as $p ) {
-                $pid = $p->ID;
-                $estado = get_post_meta($pid,'estado',true);
-                if ( $states && !in_array($estado,$states,true) ) continue;
+        // Cabeceras CSV
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="citas_odontologia.csv"');
 
-                $rows[] = [
-                    $pid,
-                    $estado,
-                    get_post_meta($pid,'fecha_hora_inicio',true),
-                    get_post_meta($pid,'fecha_hora_fin',true),
-                    get_post_meta($pid,'paciente_nombre',true),
-                    get_post_meta($pid,'paciente_cedula',true),
-                    get_post_meta($pid,'paciente_correo',true),
-                    get_post_meta($pid,'paciente_telefono',true),
-                ];
-            }
+        $out = fopen('php://output', 'w');
+        // BOM para Excel
+        fprintf($out, chr(0xEF).chr(0xBB).chr(0xBF));
+
+        fputcsv($out, ['ID','Fecha inicio','Fecha fin','Estado','Nombre','Cédula','Correo','Teléfono']);
+
+        foreach ($ids as $pid){
+            fputcsv($out, [
+                $pid,
+                get_post_meta($pid,'fecha_hora_inicio',true),
+                get_post_meta($pid,'fecha_hora_fin',true),
+                get_post_meta($pid,'estado',true),
+                get_post_meta($pid,'paciente_nombre',true),
+                get_post_meta($pid,'paciente_cedula',true),
+                get_post_meta($pid,'paciente_correo',true),
+                get_post_meta($pid,'paciente_telefono',true),
+            ]);
         }
-
-        // Devolvemos CSV como string (el front hace descarga)
-        $fh = fopen('php://temp', 'w');
-        foreach($rows as $r){ fputcsv($fh, $r); }
-        rewind($fh);
-        $csv = stream_get_contents($fh);
-        fclose($fh);
-
-        wp_send_json_success([ 'csv' => $csv ]);
+        fclose($out);
+        exit;
     }
 }
+
 }

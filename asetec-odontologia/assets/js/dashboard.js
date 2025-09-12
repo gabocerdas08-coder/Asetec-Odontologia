@@ -1,138 +1,97 @@
-jQuery(function($){
-  const $from = $('#odo_from');
-  const $to   = $('#odo_to');
-  const $q    = $('#odo_q');
-  const $btn  = $('#odo_refresh');
-  const $btnExport = $('#odo_export');
-  const $log  = $('#dash_log');
-
-  const setVal = (id, val) => { $('#'+id).text(val); };
-  const getStates = () => $('#odo_states input[type=checkbox]:checked').map((_,el)=>el.value).get();
-
-  function log(msg, isErr){
-    $log.toggleClass('is-error', !!isErr).text(msg || '');
+(function($){
+  // Mini helper
+  function valStates(){
+    var s=[]; $('.odo-states .st:checked').each(function(){ s.push(this.value); }); return s;
   }
-
-  function todayStr(d=new Date()){
-    const z = n => String(n).padStart(2,'0');
-    return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());
-  }
-
-  // Prefill: semana actual
-  const now = new Date();
-  const start = new Date(now); start.setDate(now.getDate()-6);
-  $from.val( todayStr(start) );
-  $to.val( todayStr(now) );
-
-  // ---- KPIs ----
-  function loadKPIs(){
-    log(ASETEC_ODO_DASH.i18n.loading);
-    const data = {
-      action: 'asetec_odo_dash_kpis',
-      nonce: ASETEC_ODO_DASH.nonce,
-      from: $from.val(),
-      to: $to.val(),
-      q: $q.val(),
-      states: getStates()
+  function getFilters(){
+    return {
+      from: $('#odo-from').val(),
+      to:   $('#odo-to').val(),
+      q:    $('#odo-q').val(),
+      states: valStates()
     };
-    return $.post(ASETEC_ODO_DASH.ajax, data)
-      .done(function(res){
-        if(!res || !res.success || !res.data || !res.data.kpis){ log(ASETEC_ODO_DASH.i18n.error,true); return; }
-        const k = res.data.kpis;
-        setVal('kpi_total', k.total ?? '0');
-        setVal('kpi_pendiente', k.pendiente ?? '0');
-        setVal('kpi_aprobada', k.aprobada ?? '0');
-        setVal('kpi_realizada', k.realizada ?? '0');
-        setVal('kpi_cancelada_usuario', k.cancelada_usuario ?? '0');
-        setVal('kpi_cancelada_admin', k.cancelada_admin ?? '0');
-        setVal('kpi_reprogramada', k.reprogramada ?? '0');
-        log('');
-      })
-      .fail(()=> log(ASETEC_ODO_DASH.i18n.error,true));
   }
 
-  // ---- Charts ----
-  let chartTotal, chartStates;
+  // Charts
+  let lineChart=null, donutChart=null;
 
-  function buildTotal(labels, series){
-    const ctx = document.getElementById('chart_total');
-    if(chartTotal) chartTotal.destroy();
-    chartTotal = new Chart(ctx, {
+  function renderCharts(data){
+    if (typeof window.Chart === 'undefined') {
+      console.error('Chart.js no se cargó');
+      return;
+    }
+    // KPIs
+    $('#k-total').text(data.kpis.total);
+    $('#k-pend').text(data.kpis.pendiente);
+    $('#k-aprob').text(data.kpis.aprobada);
+    $('#k-real').text(data.kpis.realizada);
+    $('#k-canu').text(data.kpis.cancelada_usuario);
+    $('#k-cana').text(data.kpis.cancelada_admin);
+    $('#k-reprog').text(data.kpis.reprogramada);
+
+    // Line
+    var ctx1 = document.getElementById('odo-chart-line').getContext('2d');
+    if (lineChart) lineChart.destroy();
+    lineChart = new Chart(ctx1, {
       type: 'line',
-      data: { labels, datasets: [{ label: 'Citas', data: series, tension: .25 }] },
-      options: { responsive:true, maintainAspectRatio:false }
+      data: {
+        labels: data.line.labels,
+        datasets: [{label:'Citas por día', data: data.line.values, tension:.25}]
+      },
+      options: {responsive:true, plugins:{legend:{display:false}}}
+    });
+
+    // Donut
+    var ctx2 = document.getElementById('odo-chart-donut').getContext('2d');
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(ctx2, {
+      type: 'doughnut',
+      data: { labels: data.donut.labels, datasets: [{ data: data.donut.values }] },
+      options: {responsive:true}
     });
   }
 
-  function buildStates(obj){
-    const ctx = document.getElementById('chart_states');
-    if(chartStates) chartStates.destroy();
-    const labels = Object.keys(obj);
-    const data = Object.values(obj);
-    chartStates = new Chart(ctx, {
-      type: 'bar',
-      data: { labels, datasets: [{ label: 'Acumulado', data }] },
-      options: { responsive:true, maintainAspectRatio:false }
+  function loadData(){
+    const payload = Object.assign({ action:'asetec_odo_dash_data', nonce:ASETEC_ODO_DASH.nonce }, getFilters());
+    $('body').css('cursor','wait');
+    $.post(ASETEC_ODO_DASH.ajax, payload).done(function(res){
+      if(res && res.success){ renderCharts(res.data); }
+      else { alert(ASETEC_ODO_DASH.i18n.error); }
+    }).fail(function(){
+      alert(ASETEC_ODO_DASH.i18n.error);
+    }).always(function(){
+      $('body').css('cursor','default');
     });
   }
 
-  function loadSeries(){
-    const data = {
-      action: 'asetec_odo_dash_series',
-      nonce: ASETEC_ODO_DASH.nonce,
-      from: $from.val(),
-      to: $to.val(),
-      q: $q.val(),
-      states: getStates()
-    };
-    return $.post(ASETEC_ODO_DASH.ajax, data)
-      .done(function(res){
-        if(!res || !res.success || !res.data){ return; }
-        buildTotal(res.data.labels || [], res.data.total || []);
-        buildStates(res.data.states || {});
-      });
-  }
-
-  // ---- Export ----
   function exportCSV(){
-    log(ASETEC_ODO_DASH.i18n.loading);
-    const data = {
-      action: 'asetec_odo_dash_export',
-      nonce: ASETEC_ODO_DASH.nonce,
-      from: $from.val(),
-      to: $to.val(),
-      q: $q.val(),
-      states: getStates()
-    };
-    $.post(ASETEC_ODO_DASH.ajax, data)
-      .done(function(res){
-        if(!res || !res.success || !res.data || !res.data.csv){ log(ASETEC_ODO_DASH.i18n.error,true); return; }
-        // descarga
-        const blob = new Blob([res.data.csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const a   = document.createElement('a');
-        a.href = url;
-        a.download = 'reporte_odontologia.csv';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        log('');
-      })
-      .fail(()=> log(ASETEC_ODO_DASH.i18n.error,true));
+    const f=getFilters();
+    const url = ASETEC_ODO_DASH.ajax + '?' + $.param({
+      action:'asetec_odo_dash_csv',
+      nonce:ASETEC_ODO_DASH.nonce,
+      from:f.from, to:f.to, q:f.q
+    }) + f.states.map(s=>'&states[]='+encodeURIComponent(s)).join('');
+    window.location = url;
   }
 
-  // Handlers
-  $btn.on('click', function(e){
-    e.preventDefault();
-    $.when(loadKPIs(), loadSeries());
+  // Default rango: últimos 7 días
+  function setDefaultDates(){
+    const today = new Date();
+    const to = today.toISOString().slice(0,10);
+    const fromD = new Date(today.getTime()-6*24*3600*1000);
+    const from = fromD.toISOString().slice(0,10);
+    $('#odo-from').val(from);
+    $('#odo-to').val(to);
+  }
+
+  $(function(){
+    if (!$('.odo-dash').length) return;
+    setDefaultDates();
+    $('#odo-refresh').on('click', loadData);
+    $('#odo-export').on('click', exportCSV);
+    // refresco al cambiar estados rápidamente
+    $('.odo-states').on('change','input', function(){ loadData(); });
+    loadData();
   });
 
-  $btnExport.on('click', function(e){
-    e.preventDefault();
-    exportCSV();
-  });
-
-  // Primera carga
-  $.when(loadKPIs(), loadSeries());
-});
+})(jQuery);

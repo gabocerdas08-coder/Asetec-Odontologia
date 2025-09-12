@@ -15,50 +15,51 @@ class ASETEC_ODO_Shortcode_Dashboard {
         add_action( 'wp_ajax_asetec_odo_dash_export', [ $this, 'ajax_export' ] );
     }
 
-    private function enqueue_assets(){
-        // CSS
-        wp_register_style(
-            self::SLUG,
-            ASETEC_ODO_URL . 'assets/css/dashboard.css',
-            [],
-            ASETEC_Odontologia::VERSION
-        );
+private function enqueue_assets(){
+    // CSS del dashboard
+    wp_register_style(
+        self::SLUG,
+        ASETEC_ODO_URL . 'assets/css/dashboard.css',
+        [],
+        ASETEC_Odontologia::VERSION
+    );
 
-        // Chart.js (ya lo tenés en assets/chartjs/chart.umd.js)
-        wp_register_script(
-            'chartjs',
-            ASETEC_ODO_URL . 'assets/chartjs/chart.umd.js',
-            [],
-            '4.4.0',
-            true
-        );
+    // Chart.js desde CDN (no requiere archivo local)
+    wp_register_script(
+        'chartjs',
+        'https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js',
+        [],
+        '4.4.3',
+        true
+    );
 
-        // JS del dashboard
-        wp_register_script(
-            self::SLUG,
-            ASETEC_ODO_URL . 'assets/js/dashboard.js',
-            [ 'jquery', 'chartjs' ],
-            ASETEC_Odontologia::VERSION,
-            true
-        );
+    // JS del dashboard (depende de chartjs)
+    wp_register_script(
+        self::SLUG,
+        ASETEC_ODO_URL . 'assets/js/dashboard.js',
+        [ 'jquery', 'chartjs' ],
+        ASETEC_Odontologia::VERSION,
+        true
+    );
 
-        wp_localize_script( self::SLUG, 'ASETEC_ODO_DASH', [
-            'ajax'  => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('asetec_odo_dash'),
-            'i18n'  => [
-                'loading'   => __('Cargando…', 'asetec-odontologia'),
-                'error'     => __('Ocurrió un error al cargar.', 'asetec-odontologia'),
-                'na'        => __('N/D', 'asetec-odontologia'),
-                'download'  => __('Descargar CSV', 'asetec-odontologia'),
-            ],
-            'states' => [
-                'pendiente','aprobada','realizada','cancelada_usuario','cancelada_admin','reprogramada'
-            ],
-        ]);
+    wp_localize_script( self::SLUG, 'ASETEC_ODO_DASH', [
+        'ajax'  => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('asetec_odo_dash'),
+        'i18n'  => [
+            'loading'   => __('Cargando…', 'asetec-odontologia'),
+            'error'     => __('Ocurrió un error al cargar.', 'asetec-odontologia'),
+            'na'        => __('N/D', 'asetec-odontologia'),
+            'download'  => __('Descargar CSV', 'asetec-odontologia'),
+        ],
+        'states' => [
+            'pendiente','aprobada','realizada','cancelada_usuario','cancelada_admin','reprogramada'
+        ],
+    ]);
 
-        wp_enqueue_style( self::SLUG );
-        wp_enqueue_script( self::SLUG );
-    }
+    wp_enqueue_style( self::SLUG );
+    wp_enqueue_script( self::SLUG );
+}
+
 
     public function render(){
         if ( ! current_user_can('manage_options') ) {

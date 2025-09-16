@@ -207,6 +207,30 @@ class ASETEC_ODO_Shortcode_Dashboard {
 
         ksort($per_day);
 
+        // Monthly data preparation
+        $monthly_map = [];
+        foreach ($ids as $pid) {
+            $start = get_post_meta($pid, 'fecha_hora_inicio', true);
+            if (!$start) continue;
+            $ts = strtotime($start);
+            if (!$ts) continue;
+            $key = date('Y-m', $ts);
+            if (!isset($monthly_map[$key])) $monthly_map[$key] = 0;
+            $monthly_map[$key]++;
+        }
+        ksort($monthly_map);
+        $monthly_labels = [];
+        $monthly_values = [];
+        foreach ($monthly_map as $ym => $count) {
+            $label_ts = strtotime($ym . '-01');
+            $monthly_labels[] = date_i18n('M Y', $label_ts);
+            $monthly_values[] = (int) $count;
+        }
+        $data['monthly'] = [
+            'labels' => $monthly_labels,
+            'values' => $monthly_values,
+        ];
+
         wp_send_json_success([
             'kpis'  => $kpis,
             'line'  => ['labels'=>array_keys($per_day), 'values'=>array_values($per_day)],
@@ -217,6 +241,7 @@ class ASETEC_ODO_Shortcode_Dashboard {
                     $kpis['cancelada_usuario'],$kpis['cancelada_admin'],$kpis['reprogramada']
                 ]
             ],
+            'monthly' => $data['monthly'], // Add monthly data to response
         ]);
     }
 

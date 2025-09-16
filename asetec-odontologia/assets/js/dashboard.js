@@ -2,6 +2,7 @@
 (function($){
   let lineChart = null;
   let donutChart = null;
+  let monthlyChart = null;
 
   // Helpers
   function getStates(){
@@ -70,6 +71,34 @@
     }
   }
 
+  function initMonthly(labels, values){
+    if (typeof Chart === 'undefined') return;
+    const ctx = ensureCtx('odo-chart-monthly'); if (!ctx) return;
+    if (!monthlyChart){
+      monthlyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: values,
+            backgroundColor: 'rgba(59,130,246,0.3)',
+            borderColor: 'rgba(59,130,246,1)',
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { y: { beginAtZero: true } }
+        }
+      });
+    } else {
+      monthlyChart.data.labels = labels;
+      monthlyChart.data.datasets[0].data = values;
+      monthlyChart.update();
+    }
+  }
+
   function refresh(){
     if (!window.ASETEC_ODO_DASH) return;
     const payload = {
@@ -107,6 +136,16 @@
       } else {
         if (!donutChart) initDonut([], []);
       }
+
+      // Mensual
+      const M = res.data.monthly || {};
+      const mLabels = Array.isArray(M.labels) ? M.labels : [];
+      const mValues = Array.isArray(M.values) ? M.values : [];
+      if (mLabels.length || mValues.length){
+        initMonthly(mLabels, mValues);
+      } else {
+        if (!monthlyChart) initMonthly([], []);
+      }
     }).fail(function(){
       /* Silencioso: no rompemos el canvas si falla */
     });
@@ -135,6 +174,7 @@
       ro = new ResizeObserver(() => {
         if (lineChart) lineChart.resize();
         if (donutChart) donutChart.resize();
+        if (monthlyChart) monthlyChart.resize();
       });
       ro.observe(box);
     }
@@ -143,3 +183,26 @@
     setTimeout(refresh, 50);
   });
 })(jQuery);
+<?php
+$monthly_map = [];
+foreach ($ids as $pid) {
+    $start = get_post_meta($pid, 'fecha_hora_inicio', true);
+    if (!$start) continue;
+    $ts = strtotime($start);
+    if (!$ts) continue;
+    $key = date('Y-m', $ts);
+    if (!isset($monthly_map[$key])) $monthly_map[$key] = 0;
+    $monthly_map[$key]++;
+}
+ksort($monthly_map);
+$monthly_labels = [];
+$monthly_values = [];
+foreach ($monthly_map as $ym => $count) {
+    $label_ts = strtotime($ym . '-01');
+    $monthly_labels[] = date_i18n('M Y', $label_ts);
+    $monthly_values[] = (int) $count;
+}
+$data['monthly'] = [
+    'labels' => $monthly_labels,
+    'values' => $monthly_values,
+];

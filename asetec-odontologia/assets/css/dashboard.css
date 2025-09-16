@@ -1,16 +1,20 @@
-.odo-dash__toolbar{
-  display:grid;
-  grid-template-columns: repeat(6, minmax(140px,1fr));
-  gap:14px;
-  align-items:end;
-  margin:12px 0 18px;
+/* Caja de gráfico con altura fija y responsive */
+.odo-chart-box{
+  position: relative;
+  min-height: 320px;   /* clave: no 0 */
+  height: 320px;
 }
-.odo-field label{ display:block; font-weight:600; margin-bottom:6px; }
-.odo-field.grow{ grid-column: span 2; }
-.odo-states{ display:flex; flex-wrap:wrap; gap:12px; }
-.odo-field.buttons{ display:flex; gap:10px; }
+@media (min-width: 768px){
+  .odo-chart-box{ height: 360px; }
+}
+.odo-chart-box canvas{
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
 
-.odo-kpis{ display:grid; gap:12px; grid-template-columns: repeat(7,minmax(120px,1fr)); margin:12px 0 22px; }
-.kpi{ background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:14px; }
-.kpi-h{ color:#6b7280; font-size:12px; margin-bottom:8px; }
-.kpi-v{ font-size:28px; font-weight:700; }
+/* Evita que algún tema/optimizador esconda el canvas */
+canvas.odo-chart{
+  visibility: visible !important;
+  opacity: 1 !important;
+}

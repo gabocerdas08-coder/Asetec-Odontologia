@@ -81,10 +81,18 @@ class ASETEC_ODO_Shortcode_Dashboard {
             </div>
 
             <h3><?php esc_html_e('Citas por día (todas las seleccionadas)','asetec-odontologia'); ?></h3>
-            <canvas id="odo-chart-line" height="80"></canvas>
+            <div class="odo-card">
+              <div class="odo-chart-box" data-no-lazy="1">
+                <canvas id="odo-chart-line" class="odo-chart" width="600" height="320"></canvas>
+              </div>
+            </div>
 
             <h3><?php esc_html_e('Distribución por estado (acumulado)','asetec-odontologia'); ?></h3>
-            <canvas id="odo-chart-donut" height="80"></canvas>
+            <div class="odo-card">
+              <div class="odo-chart-box" data-no-lazy="1">
+                <canvas id="odo-chart-donut" class="odo-chart" width="600" height="320"></canvas>
+              </div>
+            </div>
         </div>
         <?php
         return ob_get_clean();

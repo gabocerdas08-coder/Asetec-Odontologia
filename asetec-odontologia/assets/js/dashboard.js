@@ -1,21 +1,18 @@
+/* assets/js/dashboard.js */
 (function($){
   let lineChart = null;
   let donutChart = null;
 
-  // --- Helpers ---
+  // Helpers
   function getStates(){
     const arr = [];
-    $('.odo-states input.st:checked').each(function(){
-      arr.push($(this).val());
-    });
+    $('.odo-states input.st:checked').each(function(){ arr.push($(this).val()); });
     return arr;
   }
-
   function safeSet(id, val){
     const el = document.getElementById(id);
     if (el) el.textContent = (val ?? 0);
   }
-
   function paintKPIs(k){
     safeSet('k-total',   k?.total);
     safeSet('k-pend',    k?.pendiente);
@@ -24,61 +21,57 @@
     safeSet('k-canu',    k?.cancelada_usuario);
     safeSet('k-cana',    k?.cancelada_admin);
     safeSet('k-reprog',  k?.reprogramada);
-    // Puedes agregar más KPIs aquí si lo necesitas
   }
 
-  function paintLine(labels, values){
-    const canvas = document.getElementById('odo-chart-line');
-    if (!canvas || typeof Chart === 'undefined') return;
-    if (!labels || !labels.length) {
-      canvas.style.display = 'none';
-      // Opcional: muestra un mensaje "Sin datos"
-      return;
-    }
-    canvas.style.display = 'block';
-    const ctx = canvas.getContext('2d');
-    if (lineChart) { try { lineChart.destroy(); } catch(e){} }
-    lineChart = new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Citas',
-          data: values,
-          tension: 0.3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { beginAtZero: true } }
+  function ensureCtx(id){
+    const c = document.getElementById(id);
+    if (!c) return null;
+    // Si algún lazy/optimizador lo rompió, intenta recrear
+    if (c.tagName.toLowerCase() !== 'canvas'){
+      const box = c.closest('.odo-chart-box');
+      if (box){
+        box.innerHTML = '<canvas id="'+id+'" class="odo-chart" width="600" height="320"></canvas>';
+        return document.getElementById(id).getContext('2d');
       }
-    });
+      return null;
+    }
+    return c.getContext('2d');
   }
 
-  function paintDonut(labels, values){
-    const canvas = document.getElementById('odo-chart-donut');
-    if (!canvas || typeof Chart === 'undefined') return;
-    const ctx = canvas.getContext('2d');
-    if (donutChart) { try { donutChart.destroy(); } catch(e){} }
-    donutChart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: labels || [],
-        datasets: [{
-          data: values || [],
-          backgroundColor: [
-            '#f59e0b', '#3b82f6', '#10b981', '#ef4444', '#8b5cf6', '#64748b'
-          ]
-        }]
-      },
-      options: { responsive: true, maintainAspectRatio: false }
-    });
+  function initLine(labels, values){
+    if (typeof Chart === 'undefined') return; // Chart.js aún no
+    const ctx = ensureCtx('odo-chart-line'); if (!ctx) return;
+    if (!lineChart){
+      lineChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: labels, datasets: [{ label:'Citas', data: values, tension:0.3 }] },
+        options: { responsive:true, maintainAspectRatio:false, scales:{ y:{ beginAtZero:true } } }
+      });
+    } else {
+      lineChart.data.labels = labels;
+      lineChart.data.datasets[0].data = values;
+      lineChart.update();
+    }
+  }
+
+  function initDonut(labels, values){
+    if (typeof Chart === 'undefined') return;
+    const ctx = ensureCtx('odo-chart-donut'); if (!ctx) return;
+    if (!donutChart){
+      donutChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: { labels: labels, datasets: [{ data: values }] },
+        options: { responsive:true, maintainAspectRatio:false }
+      });
+    } else {
+      donutChart.data.labels = labels;
+      donutChart.data.datasets[0].data = values;
+      donutChart.update();
+    }
   }
 
   function refresh(){
     if (!window.ASETEC_ODO_DASH) return;
-
     const payload = {
       action: ASETEC_ODO_DASH.action,
       nonce:  ASETEC_ODO_DASH.nonce,
@@ -94,15 +87,28 @@
       // KPIs
       paintKPIs(res.data.kpis || {});
 
-      // Gráfica de línea
-      const l = res.data.line || {labels:[], values:[]};
-      paintLine(l.labels, l.values);
+      // Línea
+      const L = res.data.line || {};
+      const lLabels = Array.isArray(L.labels) ? L.labels : [];
+      const lValues = Array.isArray(L.values) ? L.values : [];
+      if (lLabels.length || lValues.length){
+        initLine(lLabels, lValues);
+      } else {
+        // no borres el gráfico si ya existe
+        if (!lineChart) initLine([], []);
+      }
 
       // Donut
-      const d = res.data.donut || {labels:[], values:[]};
-      paintDonut(d.labels, d.values);
+      const D = res.data.donut || {};
+      const dLabels = Array.isArray(D.labels) ? D.labels : [];
+      const dValues = Array.isArray(D.values) ? D.values : [];
+      if (dLabels.length || dValues.length){
+        initDonut(dLabels, dValues);
+      } else {
+        if (!donutChart) initDonut([], []);
+      }
     }).fail(function(){
-      // Puedes mostrar un toast o mensaje de error aquí si lo deseas
+      /* Silencioso: no rompemos el canvas si falla */
     });
   }
 
@@ -122,8 +128,18 @@
     $('#odo-refresh').on('click', refresh);
     $('#odo-export').on('click', exportCSV);
 
-    // Primera carga automática
-    refresh();
-  });
+    // Si el tema redimensiona, actualiza el canvas
+    let ro;
+    const box = document.querySelector('.odo-chart-box');
+    if (box && 'ResizeObserver' in window){
+      ro = new ResizeObserver(() => {
+        if (lineChart) lineChart.resize();
+        if (donutChart) donutChart.resize();
+      });
+      ro.observe(box);
+    }
 
+    // Primer render con pequeño defer para asegurar layout
+    setTimeout(refresh, 50);
+  });
 })(jQuery);

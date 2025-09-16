@@ -30,19 +30,22 @@
   function paintLine(labels, values){
     const canvas = document.getElementById('odo-chart-line');
     if (!canvas || typeof Chart === 'undefined') return;
+    if (!labels || !labels.length) {
+      canvas.style.display = 'none';
+      // Opcional: muestra un mensaje "Sin datos"
+      return;
+    }
+    canvas.style.display = 'block';
     const ctx = canvas.getContext('2d');
     if (lineChart) { try { lineChart.destroy(); } catch(e){} }
     lineChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: labels || [],
+        labels: labels,
         datasets: [{
           label: 'Citas',
-          data: values || [],
-          tension: 0.3,
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,0.1)',
-          pointBackgroundColor: '#3b82f6'
+          data: values,
+          tension: 0.3
         }]
       },
       options: {

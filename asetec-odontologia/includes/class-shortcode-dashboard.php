@@ -93,6 +93,13 @@ class ASETEC_ODO_Shortcode_Dashboard {
                 <canvas id="odo-chart-donut" class="odo-chart" width="600" height="320"></canvas>
               </div>
             </div>
+
+            <div class="odo-card">
+              <h3><?php esc_html_e('Citas por mes', 'asetec-odontologia'); ?></h3>
+              <div class="odo-chart-box" data-no-lazy="1">
+                <canvas id="odo-chart-monthly" class="odo-chart" width="600" height="320"></canvas>
+              </div>
+            </div>
         </div>
         <?php
         return ob_get_clean();
